@@ -1,0 +1,64 @@
+---
+title: "R Notebook"
+output:
+  pdf_document: default
+  html_notebook: default
+---
+
+```{r "setup", include=FALSE}
+knitr::opts_knit$set(root.dir = normalizePath('C:/Users/maxim/OneDrive - Montefiore Medicine/Shechter/Processed_Data/'))
+library(tidyverse)
+library(VennDiagram)
+library(RColorBrewer)
+
+```
+
+```{r}
+##This is for GSK591
+df_1 <- read.csv('C:/Users/maxim/OneDrive - Montefiore Medicine/Shechter/Processed_Data/GluC_02/Gluc_MMA_ADMA_SDMA_PerResidue.csv')
+df_1 <- df_1[df_1$GSK591_vs_DMSO_p.val < 0.05,]
+df_2 <- read.csv("C:/Users/maxim/OneDrive - Montefiore Medicine/Shechter/Processed_Data/Tryp_02/Trypsin_MMA_ADMA_SDMA_PerResidue.csv")
+df_2 <- df_2[df_2$GSK591_vs_DMSO_p.val < 0.05,]
+
+data <- list(GluC = df_1, Trypsin = df_2)
+
+#DMSO_color <- '#d4d4d4'
+#GSK_color <- '#008837'
+#MS023_color <- '#7b3294'
+
+plt <- venn.diagram(x = list(data[[1]]$name, data[[2]]$name), category.names = c("GluC-GSK591" , "Trypsin-GSK591"), filename = NULL, fill = c('#bababa','#bababa'), euler.d=T, scaled=T, output = F)
+##ggsave(plt, file= paste('InputChromatin_GSK_vs_DMSO_PTMscan', 'pdf' ,sep="."), device ='pdf', width = 15, height = 15, dpi = 300)
+
+overlap <- calculate.overlap(x = list(data[[1]]$name, data[[2]]$name))
+
+##write.csv(overlap$a3, 'InputChromatin_GSK_vs_DMSO_PTMscan_common.csv')
+
+plot(grid::grid.draw(plt), x= 1, y= 1)
+
+```
+
+```{r}
+##This is for MS023
+df_1 <- read.csv('C:/Users/maxim/OneDrive - Montefiore Medicine/Shechter/Processed_Data/GluC_02/Gluc_MMA_ADMA_SDMA_PerResidue.csv')
+df_1 <- df_1[df_1$MS023_vs_DMSO_p.val < 0.05,]
+df_2 <- read.csv("C:/Users/maxim/OneDrive - Montefiore Medicine/Shechter/Processed_Data/Tryp_02/Trypsin_MMA_ADMA_SDMA_PerResidue.csv")
+df_2 <- df_2[df_2$MS023_vs_DMSO_p.val < 0.05,]
+
+data <- list(GluC = df_1, Trypsin = df_2)
+
+#DMSO_color <- '#d4d4d4'
+#GSK_color <- '#008837'
+#MS023_color <- '#7b3294'
+
+plt <- venn.diagram(x = list(data[[1]]$name, data[[2]]$name), category.names = c("GluC-GSK591" , "Trypsin-GSK591"), filename = NULL, fill = c('#bababa','#bababa'), euler.d=T, scaled=T, output = F)
+##ggsave(plt, file= paste('InputChromatin_GSK_vs_DMSO_PTMscan', 'pdf' ,sep="."), device ='pdf', width = 15, height = 15, dpi = 300)
+
+overlap <- calculate.overlap(x = list(data[[1]]$name, data[[2]]$name))
+
+##write.csv(overlap$a3, 'InputChromatin_GSK_vs_DMSO_PTMscan_common.csv')
+
+plot(grid::grid.draw(plt), x= 1, y= 1)
+
+```
+
+
