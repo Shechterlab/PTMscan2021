@@ -19,7 +19,7 @@ library(ggplot2)
 library(viridisLite)
 
 Peptide_longer <- readRDS("C:/Users/maxim/OneDrive - Montefiore Medicine/Shechter/Processed_Data/Tryp_02/ADMA_tidy_TheoMW_03.RDS")
-Peptide_longer <- Peptide_longer[!duplicated(Peptide_longer[c(grep('Sequence', colnames(Peptide_longer)), grep('Theo.MHplus.in.Da', colnames(Peptide_longer)), grep('ID', colnames(Peptide_longer)))]),]
+#Peptide_longer <- Peptide_longer[!duplicated(Peptide_longer[c(grep('Sequence', colnames(Peptide_longer)), grep('Theo.MHplus.in.Da', colnames(Peptide_longer)), grep('ID', colnames(Peptide_longer)))]),]
 #Peptide_longer[is.na(Peptide_longer)] <- 0
 Peptide_wider <- as.data.frame(Peptide_longer %>% select(-File.ID, -Replicate, -Inhibitor, -IP) %>%
   pivot_wider(names_from = ID, values_from = Abundance))
