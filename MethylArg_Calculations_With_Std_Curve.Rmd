@@ -1,0 +1,284 @@
+---
+title: "R Notebook"
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r "setup", include=FALSE}
+knitr::opts_knit$set(root.dir = normalizePath('C:\\Users\\maxim\\OneDrive - Montefiore Medicine\\Shechter\\TotalMethylArg'))
+knitr::opts_chunk$set(fig.width=12, fig.height=8) 
+library(tidyverse)
+library(ggpubr)
+```
+
+
+```{r}
+data <- read.csv('A10_1_100_XenB_Yan.mzXML_10.csv_MASTER_MZ_2_decimal_points.csv')
+df <- data
+```
+
+
+```{r "Rme2 SIM std curve"}
+#data <- read.csv('A10_1_100_XenB_Yan.mzXML_10.csv_MASTER_MZ_2_decimal_points.csv')
+df <- data
+df <- df[2:nrow(df),]
+df$filename <- as.numeric(df$filename)
+#df$filename <- round(df$filename, digits = 2)
+df <- df[c(1,grep('_standard_Yan.mzXML_3.csv', colnames(df)))]
+colnames(df) <- gsub('_standard_Yan.mzXML_3.csv', '', colnames(df))
+colnames(df) <- gsub('^[^_]*_', '', colnames(df))
+
+df[is.na(df)] <- 0
+df$filename <- as.character(df$filename)
+
+df2 <- df[grep('203.15', df$filename),]
+
+df3 <- df2[c(1,5,6,7,8,9,10,11,12,13,2,3,4,14,15,18,19,16,17)]
+
+df3 <- df3[,c(1,15:ncol(df3))]
+
+std_rme2 <- df3
+
+std_rme2.m <- reshape2::melt(std_rme2)
+
+std_rme2.m$filename <- as.character(std_rme2.m$filename)
+std_rme2.m$variable <- as.numeric(as.character(std_rme2.m$variable))
+
+#pdf('C:\\Users\\maxim\\OneDrive\\Shechter\\TotalMethylArg\\methylarg_std_rme2curves.pdf')
+ggplot(std_rme2.m, aes(x=variable, y=value, shape = filename, color=filename)) + 
+  geom_point() + 
+  facet_wrap(~filename) +
+  stat_cor(label.y = max(std_rme2.m$variable))+
+  stat_regline_equation() +
+  geom_smooth(method=lm)+
+  #scale_shape_manual(values=c(21))+ 
+  #scale_color_manual(values=c('#000000'))+
+  theme(legend.position="top")+
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+          panel.background = element_blank(), axis.line = element_line(colour = "black"), legend.position="top")+
+  ylab('abundance')+
+  xlab('concentration (uM)')
+#dev.off()
+
+```
+
+
+```{r "me2s/me2a standard curve 30HCD"}
+#data <- read.csv('A10_1_100_XenB_Yan.mzXML_10.csv_MASTER_MZ_2_decimal_points.csv')
+df <- data
+df <- df[2:nrow(df),]
+df$filename <- as.numeric(df$filename)
+#df$filename <- round(df$filename, digits = 2)
+df <- df[c(1,grep('Rme2s_2a_', colnames(df)))]
+df <- df[c(1,grep('Yan.mzXML_10.csv', colnames(df)))]
+colnames(df) <- gsub('_Yan.mzXML_10.csv', '', colnames(df))
+#colnames(df) <- gsub('^[^_]*_', '', colnames(df))
+
+df[is.na(df)] <- 0
+df$filename <- as.character(df$filename)
+
+values <- c('172.11','203.15')
+
+df2 <- df[grep(paste(values, collapse = '|'), df$filename),]
+
+df3 <- df2[c(1,4,6,5,3,2)]
+
+df3 <- df3[,c(2:ncol(df3))]
+
+#get ratio of me2s/total me2
+df3 <- rbind(df3, df3[1,]/df3[2,])
+
+std_me2s_me2a <- df3[3,]
+colnames(std_me2s_me2a) <- c('0.1','0.2','1','5','10')
+std_me2s_me2a <- std_me2s_me2a[1:3]
+
+std_me2s_me2a.m <- reshape2::melt(std_me2s_me2a)
+
+#std_me2s_me2a.m$filename <- as.character(std_me2s_me2a.m$filename)
+std_me2s_me2a.m$variable <- as.numeric(as.character(std_me2s_me2a.m$variable))
+
+#pdf('C:\\Users\\maxim\\OneDrive\\Shechter\\TotalMethylArg\\methylarg_std_me2s_me2acurves.pdf')
+ggplot(std_me2s_me2a.m, aes(x=variable, y=value)) + 
+  geom_point() + 
+  stat_cor(label.y = max(std_me2s_me2a.m$variable))+
+  stat_regline_equation() +
+  geom_smooth(method=lm)+
+  #scale_shape_manual(values=c(21))+ 
+  #scale_color_manual(values=c('#000000'))+
+  theme(legend.position="top")+
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+          panel.background = element_blank(), axis.line = element_line(colour = "black"), legend.position="top")+
+  ylab('Ratio of Abundance(me2s/Total me2)')+
+  xlab('Me2s/Me2a')
+#dev.off()
+
+```
+
+```{r "define functions to solve for concentration"}
+
+me2 <- function(abundance) {
+  concentration <- (abundance + 110000) / 180000000
+  return(concentration)
+}
+
+
+me2s.me2_ratio <- function(ratio_me2s_me2) {
+  concentration <- (ratio_me2s_me2 - 0.025) / 0.74
+  return(concentration)
+}
+
+me2s_fromratio <- function(me2_concentration, ratio) { 
+  me2s_concentration <- me2_concentration * ratio
+  return(me2s_concentration)
+  }
+
+me2a_fromratio <- function(me2_concentration, me2s) { 
+  if (me2s < 0) {
+    me2a_concentration <- me2_concentration - 0
+  }
+  if (me2s >= 0) {
+    me2a_concentration <- me2_concentration - me2s
+  }
+  return(me2a_concentration)
+  }
+```
+
+
+```{r "solve for me2"}
+df <- data
+
+df <- df[c(1,grep('_3.csv', colnames(df)))]
+df <- df[c(1,grep('1_10_', colnames(df)))]
+colnames(df) <- gsub('_Yan.mzXML_3.csv', '', colnames(df))
+
+df[is.na(df)] <- 0
+
+df$filename <- as.character(df$filename)
+
+df2 <- df[grep('203.15', df$filename),]
+
+df2 <- df2[1:(ncol(df)-1)]
+
+df_me2 <- apply(df2[2:ncol(df2)],2,me2)
+```
+
+
+
+```{r "solve for me2s and me2a using ratio from std curve"}
+##this gives a similar result as using the direct 172.11 MS2 std curve
+df <- data
+
+df <- df[c(1,grep('_10.csv', colnames(df)))]
+df <- df[c(1,grep('1_10_', colnames(df)))]
+colnames(df) <- gsub('_Yan.mzXML_10.csv', '', colnames(df))
+
+
+
+df[is.na(df)] <- 0
+df$filename <- as.character(df$filename)
+
+values <- c('172.11','203.15')
+
+
+df2 <- df[grep(paste(values, collapse = '|'), df$filename),]
+df2 <- df2[1:(ncol(df)-1)]
+
+df3 <- df2[,c(2:ncol(df2))]
+
+#get ratio of me2s/total me2 and solve for me2s based on me2 * me2s
+df3 <- rbind(df3, df3[1,]/df3[2,])
+
+df_me2s.me2 <- apply(df3[3,],2,me2s.me2_ratio)
+
+df_me2s_fromratio <- mapply(me2s_fromratio,df_me2, df_me2s.me2)
+
+df_me2a_fromratio <- mapply(me2a_fromratio, df_me2, df_me2s_fromratio)
+```
+
+
+
+```{r fig.height = 10, fig.width = 20, fig.align = "center"}
+library(plyr)
+library(ggforce)
+plot <- rbind(df_me2, df_me2s_fromratio, df_me2a_fromratio)
+colnames(plot) <- sub('.*_','' ,colnames(plot))
+plot.m <- reshape2::melt(plot)
+plot.m <- arrange(plot.m, Var2, value)
+plot.m <- ddply(plot.m, "Var2",
+                transform, label_ypos=cumsum(value))
+
+order <- c('DMSOA', 'DMSOB',  'GSKA', 'GSKB', 'MS023A','MS023B','IMR90A','IMR90B','XenA','XenB')
+#convert dataframe names to factors to allow ordering
+plot.m$Var2 <- factor(plot.m$Var2, levels = order)
+
+
+#pdf('C:\\Users\\maxim\\OneDrive\\Shechter\\TotalMethylArg\\methylarg_std_2scurves.pdf')
+ggplot(data=plot.m, aes(x=Var2, y=value, fill=Var1)) +
+  geom_bar(stat="identity", position = position_dodge())+
+  #geom_text(aes(y=label_ypos, label=value), vjust=1.6, 
+   #         color="white", size=3.5)+
+  scale_fill_brewer(palette="Paired")+
+  #theme(axis.line = element_line(color = 'black', size = 1, linetype = 'solid'))+
+  theme_classic2()+
+  facet_zoom(ylim = c(0, 0.007))+
+  ylab('Conc (uM)')+
+  xlab('Sample')
+#dev.off()
+```
+```{r fig.height = 10, fig.width = 20, fig.align = "center"}
+plot <- rbind( df_me2,df_me2s_fromratio, df_me2a_fromratio)
+colnames(plot) <- sub('.*_','' ,colnames(plot))
+plot <- t(apply(plot, 1, function(x) x / unlist(plot[1, ])))
+plot.m <- reshape2::melt(plot)
+plot.m <- arrange(plot.m, Var2, value)
+plot.m <- ddply(plot.m, "Var2",
+                transform, label_ypos=cumsum(value))
+
+order <- c('DMSOA', 'DMSOB',  'GSKA', 'GSKB', 'MS023A','MS023B','IMR90A','IMR90B','XenA','XenB')
+#convert dataframe names to factors to allow ordering
+plot.m$Var2 <- factor(plot.m$Var2, levels = order)
+
+
+#pdf('C:\\Users\\maxim\\OneDrive\\Shechter\\TotalMethylArg\\methylarg_std_2scurves.pdf')
+ggplot(data=plot.m, aes(x=Var2, y=value, fill=Var1)) +
+  geom_bar(stat="identity", position = position_dodge())+
+  #geom_text(aes(y=label_ypos, label=value), vjust=1.6, 
+   #         color="white", size=3.5)+
+  scale_fill_brewer(palette="Paired")+
+  #theme(axis.line = element_line(color = 'black', size = 1, linetype = 'solid'))+
+  theme_classic2()+
+  facet_zoom(ylim = c(0, 0.005))+
+  ylab('Percent of Total Arginine')+
+  xlab('Sample')
+#dev.off()
+```
+
+
+```{r fig.height = 10, fig.width = 20, fig.align = "center"}
+plot <- rbind(df_me2, df_me2s_fromratio, df_me2a_fromratio)
+colnames(plot) <- sub('.*_','' ,colnames(plot))
+plot <- t(apply(plot, 1, function(x) x / unlist(plot[1, ])))
+plot.m <- reshape2::melt(plot)
+plot.m <- arrange(plot.m, Var2, value)
+plot.m <- ddply(plot.m, "Var2",
+                transform, label_ypos=cumsum(value))
+
+order <- c('DMSOA', 'DMSOB',  'GSKA', 'GSKB', 'MS023A','MS023B','IMR90A','IMR90B','XenA','XenB')
+#convert dataframe names to factors to allow ordering
+plot.m$Var2 <- factor(plot.m$Var2, levels = order)
+
+
+#pdf('C:\\Users\\maxim\\OneDrive\\Shechter\\TotalMethylArg\\methylarg_std_2scurves.pdf')
+ggplot(data=plot.m, aes(x=Var2, y=value, fill=Var1)) +
+  geom_bar(stat="identity", position = position_dodge())+
+  #geom_text(aes(y=label_ypos, label=value), vjust=1.6, 
+   #         color="white", size=3.5)+
+  scale_fill_brewer(palette="Paired")+
+  #theme(axis.line = element_line(color = 'black', size = 1, linetype = 'solid'))+
+  theme_classic2()+
+  #facet_zoom(ylim = c(0, 0.007))+
+  ylab('Percent of Rme2')+
+  xlab('Sample')
+#dev.off()
+```
