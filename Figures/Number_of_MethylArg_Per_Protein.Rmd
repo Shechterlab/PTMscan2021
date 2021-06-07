@@ -1,0 +1,41 @@
+---
+title: "R Notebook"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+---
+```{r "setup", include=FALSE}
+#Set the WD here
+knitr::opts_chunk$set(fig.width=12, fig.height=8) 
+library(tidyverse)
+library(plyr)
+library(biomaRt)
+```
+
+```{r}
+df <- read.csv('C:\\Users\\maxim\\OneDrive - Montefiore Medicine\\Shechter\\DEP\\Notebooks\\Combined\\ALL\\PTMscan_MethylArg_Residues_noMinRep_noAbundance.csv')
+
+df <- df[!duplicated(df[grep('Accession|position',colnames(df))]),]
+
+df_n <- ddply(df, .(Accession),nrow)
+```
+
+
+```{r fig.height = 8, fig.width = 12, fig.align = "center"}
+ggplot(data=df_n, aes(x=V1)) +
+  geom_histogram(bins = max(df_n$V1))+
+  scale_fill_brewer(palette="Paired")+
+  theme(legend.position = "none",
+        axis.text.y   = element_text(size=12, colour = "black"),
+        axis.text.x   = element_text(size=12, colour = "black", angle=90),
+        axis.title.y  = element_text(size=12, colour = "black"),
+        axis.title.x  = element_text(size=12, colour = "black"),
+        panel.background = element_blank(),
+        panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(),
+        axis.line = element_line(colour = "black"),
+        panel.border = element_rect(colour = "black", fill=NA, size=1))+
+  ylab('# of Proteins')+
+  xlab('# of Methylarginines')
+```

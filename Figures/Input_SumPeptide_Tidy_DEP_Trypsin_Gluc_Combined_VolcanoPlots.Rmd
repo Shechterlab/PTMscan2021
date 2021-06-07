@@ -1,0 +1,126 @@
+---
+title: "R Notebook"
+output:
+  html_document:
+    df_print: paged
+  pdf_document: default
+---
+```{r "setup", include=FALSE}
+knitr::opts_knit$set(root.dir = normalizePath('C:/Users/maxim/OneDrive - Montefiore Medicine/Shechter/Processed_Data/'))
+library(tidyverse)
+library(ggrepel)
+library(ggpubr)
+```
+
+
+```{r}
+GluC <- read.csv("C:/Users/maxim/OneDrive - Montefiore Medicine/Shechter/DEP/Notebooks/GluC/SumPeptide/Input_Peptide_Tidy_DEP_Gluc_SumPeptides_WideFormat.csv")
+GluC$data <- 'GluC'
+GluC_GSK591 <- GluC[order(GluC$GSK591_input_vs_DMSO_input_p.val, decreasing = FALSE),]
+GluC_GSK591[GluC_GSK591$GSK591_input_vs_DMSO_input_p.val > 0.05, "group"] <- 'not_significant' 
+GluC_GSK591[GluC_GSK591$GSK591_input_vs_DMSO_input_p.val < 0.05, "group"] <- 'significant' 
+
+GluC_MS023 <- GluC[order(GluC$MS023_input_vs_DMSO_input_p.val, decreasing = FALSE),]
+GluC_MS023[GluC_MS023$MS023_input_vs_DMSO_input_p.val > 0.05, "group"] <- 'not_significant' 
+GluC_MS023[GluC_MS023$MS023_input_vs_DMSO_input_p.val < 0.05, "group"] <- 'significant' 
+
+
+Trypsin <-  read.csv("C:/Users/maxim/OneDrive - Montefiore Medicine/Shechter/DEP/Notebooks/Trypsin/SumPeptide/Input_Peptide_Tidy_DEP_Trypsin_SumPeptides_WideFormat.csv")
+Trypsin$data <- 'Trypsin'
+Trypsin_GSK591 <- Trypsin[order(Trypsin$GSK591_input_vs_DMSO_input_p.val, decreasing = FALSE),]
+Trypsin_GSK591[Trypsin_GSK591$GSK591_input_vs_DMSO_input_p.val > 0.05, "group"] <- 'not_significant' 
+Trypsin_GSK591[Trypsin_GSK591$GSK591_input_vs_DMSO_input_p.val < 0.05, "group"] <- 'significant' 
+
+Trypsin_MS023 <- Trypsin[order(Trypsin$MS023_input_vs_DMSO_input_p.val, decreasing = FALSE),]
+Trypsin_MS023[Trypsin_MS023$MS023_input_vs_DMSO_input_p.val > 0.05, "group"] <- 'not_significant' 
+Trypsin_MS023[Trypsin_MS023$MS023_input_vs_DMSO_input_p.val < 0.05, "group"] <- 'significant' 
+
+data_GSK591 <- rbind(GluC_GSK591, Trypsin_GSK591)
+data_GSK591 <- data_GSK591[order(data_GSK591$GSK591_input_vs_DMSO_input_p.val, decreasing = FALSE),]
+
+
+data_MS023 <- rbind(GluC_MS023, Trypsin_MS023)
+data_MS023 <- data_MS023[order(data_MS023$MS023_input_vs_DMSO_input_p.val, decreasing = FALSE),]
+
+```
+
+
+
+```{r}
+ggplot(data_GSK591, aes(x = GSK591_input_vs_DMSO_input_diff, y = -log2(GSK591_input_vs_DMSO_input_p.val), shape = data)) + 
+  geom_point(colour = ifelse(data_GSK591$GSK591_input_vs_DMSO_input_p.val > 0.05, '#d4d4d4', '#008837'), size = 1, alpha = 1) + 
+  scale_shape_manual(values=c(0,1)) +
+      geom_text_repel(data = subset(data_GSK591, group == 'significant')[1:30,], aes(label=Gene.Symbol),  size=2, colour = "black", max.overlaps = 100)+
+  geom_vline(xintercept = 0, color = "black", linetype = "dotted", size = 0.5) +
+  geom_hline(yintercept = 4.32, color = "black", linetype = "dotted", size = 0.5) +
+  theme(legend.position = "none",
+        axis.text.y   = element_text(size=12, colour = "black"),
+        axis.text.x   = element_text(size=12, colour = "black"),
+        axis.title.y  = element_text(size=12, colour = "black"),
+        axis.title.x  = element_text(size=12, colour = "black"),
+        panel.background = element_blank(),
+        panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(),
+        axis.line = element_line(colour = "black"),
+        panel.border = element_rect(colour = "black", fill=NA, size=1))+
+  xlim(-10,10)+
+  ylim(0,30)+
+  labs(title = "GSK591 vs. Control Input Proteome", 
+       subtitle = "Trypsin Protein based results", 
+       x ="Log2 (GSK591/Control)", y = "-Log2 (p-value)") 
+
+
+ggplot(data_MS023, aes(x = MS023_input_vs_DMSO_input_diff, y = -log2(MS023_input_vs_DMSO_input_p.val), shape = data)) + 
+  geom_point(colour = ifelse(data_MS023$MS023_input_vs_DMSO_input_p.val > 0.05, '#d4d4d4', '#7b3294'), size = 1, alpha = 1) + 
+  scale_shape_manual(values=c(0,1)) +
+      geom_text_repel(data = subset(data_MS023, group == 'significant')[1:30,], aes(label=Gene.Symbol),  size=2, colour = "black", max.overlaps = 100)+
+  geom_vline(xintercept = 0, color = "black", linetype = "dotted", size = 0.5) +
+  geom_hline(yintercept = 4.32, color = "black", linetype = "dotted", size = 0.5) +
+  theme(legend.position = "none",
+        axis.text.y   = element_text(size=12, colour = "black"),
+        axis.text.x   = element_text(size=12, colour = "black"),
+        axis.title.y  = element_text(size=12, colour = "black"),
+        axis.title.x  = element_text(size=12, colour = "black"),
+        panel.background = element_blank(),
+        panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(),
+        axis.line = element_line(colour = "black"),
+        panel.border = element_rect(colour = "black", fill=NA, size=1))+
+  xlim(-10,10)+
+  ylim(0,30)+
+  labs(title = "MS023 vs. Control Input Proteome", 
+       subtitle = "Trypsin Protein based results", 
+       x ="Log2 (MS023/Control)", y = "-Log2 (p-value)") 
+
+```
+```{r}
+df <- merge(data_GSK591, data_MS023, by = 'name')
+df <- df[df$group.x == 'significant' & df$group.y == 'significant',]
+df <- df[!duplicated(df$Accession.x),]
+
+ggplot(df, aes(x = GSK591_input_vs_DMSO_input_diff.x, y = MS023_input_vs_DMSO_input_diff.x)) + 
+  geom_point(aes(shape = data.x), colour = '#bababa', size = 1, alpha = 1) + 
+  scale_shape_manual(values=c(0,1)) +
+    geom_smooth(method=lm,   # Add linear regression lines
+              se=FALSE, fullrange = TRUE, color = 'black') + 
+        #geom_text_repel(data = subset(df, group == 'significant')[1:30,], aes(label=Gene.Symbol),  size=2, colour = "black", max.overlaps = 100)+
+  stat_cor(method = 'spearman')+
+  geom_vline(xintercept = 0, color = "black", linetype = "dotted", size = 0.5) +
+  geom_hline(yintercept = 0, color = "black", linetype = "dotted", size = 0.5) +
+  theme(legend.position = "none",
+        axis.text.y   = element_text(size=12, colour = "black"),
+        axis.text.x   = element_text(size=12, colour = "black"),
+        axis.title.y  = element_text(size=12, colour = "black"),
+        axis.title.x  = element_text(size=12, colour = "black"),
+        panel.background = element_blank(),
+        panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(),
+        axis.line = element_line(colour = "black"),
+        panel.border = element_rect(colour = "black", fill=NA, size=1))+
+  xlim(-10,10)+
+  ylim(-10,10)+
+  labs(title = "GSK591 vs. MS023 Input Proteome", 
+       subtitle = "", 
+       x ="Log2 (GSK591/Control)", y = "Log2 (MS023/Control)") 
+
+```

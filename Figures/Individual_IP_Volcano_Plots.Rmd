@@ -1,0 +1,208 @@
+---
+title: "Individual IP Volcano Plots"
+output:
+  html_document:
+    df_print: paged
+  pdf_document: default
+---
+```{r "setup", include=FALSE}
+knitr::opts_chunk$set(fig.width=9, fig.height=6) 
+knitr::opts_knit$set(root.dir = normalizePath('C:/Users/maxim/OneDrive - Montefiore Medicine/Shechter/Processed_Data/'))
+library(tidyverse)
+library(ggrepel)
+```
+
+```{r}
+
+MMA_trypsin <- read.csv("C:/Users/maxim/OneDrive - Montefiore Medicine/Shechter/Processed_Data/MMA_Trypsin_Peptide.csv")
+MMA_trypsin$data <- 'Trypsin'
+ADMA_trypsin <- read.csv("C:/Users/maxim/OneDrive - Montefiore Medicine/Shechter/Processed_Data/ADMA_Trypsin_Peptide.csv")
+ADMA_trypsin$data <- 'Trypsin'
+SDMA_trypsin <- read.csv("C:/Users/maxim/OneDrive - Montefiore Medicine/Shechter/Processed_Data/SDMA_Trypsin_Peptide.csv")
+SDMA_trypsin$data <- 'Trypsin'
+
+MMA_gluc <- read.csv("C:/Users/maxim/OneDrive - Montefiore Medicine/Shechter/Processed_Data/GluC_MMA_Peptide.csv")
+MMA_gluc$data <- 'GluC'
+ADMA_gluc <- read.csv("C:/Users/maxim/OneDrive - Montefiore Medicine/Shechter/Processed_Data/GluC_ADMA_Peptide.csv")
+ADMA_gluc$data <- 'GluC'
+SDMA_gluc <- read.csv("C:/Users/maxim/OneDrive - Montefiore Medicine/Shechter/Processed_Data/GluC_SDMA_Peptide.csv")
+SDMA_gluc$data <- 'GluC'
+
+```
+
+
+```{r}
+df_MMA <- rbind(MMA_trypsin, MMA_gluc)
+df_MMA <- df_MMA[grep('R', df_MMA$Modifications),]
+df_ADMA <- rbind(ADMA_trypsin, ADMA_gluc)
+df_ADMA <- df_ADMA[grep('R', df_ADMA$Modifications),]
+df_SDMA <- rbind(SDMA_trypsin, SDMA_gluc)
+df_SDMA <- df_SDMA[grep('R', df_SDMA$Modifications),]
+
+
+df_MMA_GSK591 <- df_MMA[order(df_MMA$GSK591_MMA_vs_DMSO_MMA_p.val, decreasing = FALSE),]
+df_MMA_GSK591[df_MMA_GSK591$GSK591_MMA_vs_DMSO_MMA_p.val > 0.05, "group"] <- 'not_significant' 
+df_MMA_GSK591[df_MMA_GSK591$GSK591_MMA_vs_DMSO_MMA_p.val < 0.05, "group"] <- 'significant' 
+
+df_ADMA_GSK591 <- df_ADMA[order(df_ADMA$GSK591_ADMA_vs_DMSO_ADMA_p.val, decreasing = FALSE),]
+df_ADMA_GSK591[df_ADMA_GSK591$GSK591_ADMA_vs_DMSO_ADMA_p.val > 0.05, "group"] <- 'not_significant' 
+df_ADMA_GSK591[df_ADMA_GSK591$GSK591_ADMA_vs_DMSO_ADMA_p.val < 0.05, "group"] <- 'significant' 
+
+df_SDMA_GSK591 <- df_SDMA[order(df_SDMA$GSK591_SDMA_vs_DMSO_SDMA_p.val, decreasing = FALSE),]
+df_SDMA_GSK591[df_SDMA_GSK591$GSK591_SDMA_vs_DMSO_SDMA_p.val > 0.05, "group"] <- 'not_significant' 
+df_SDMA_GSK591[df_SDMA_GSK591$GSK591_SDMA_vs_DMSO_SDMA_p.val < 0.05, "group"] <- 'significant' 
+
+
+
+df_MMA_MS023 <- df_MMA[order(df_MMA$MS023_MMA_vs_DMSO_MMA_p.val, decreasing = FALSE),]
+df_MMA_MS023[df_MMA_MS023$MS023_MMA_vs_DMSO_MMA_p.val > 0.05, "group"] <- 'not_significant' 
+df_MMA_MS023[df_MMA_MS023$MS023_MMA_vs_DMSO_MMA_p.val < 0.05, "group"] <- 'significant' 
+
+df_ADMA_MS023 <- df_ADMA[order(df_ADMA$MS023_ADMA_vs_DMSO_ADMA_p.val, decreasing = FALSE),]
+df_ADMA_MS023[df_ADMA_MS023$MS023_ADMA_vs_DMSO_ADMA_p.val > 0.05, "group"] <- 'not_significant' 
+df_ADMA_MS023[df_ADMA_MS023$MS023_ADMA_vs_DMSO_ADMA_p.val < 0.05, "group"] <- 'significant' 
+
+df_SDMA_MS023 <- df_SDMA[order(df_SDMA$MS023_SDMA_vs_DMSO_SDMA_p.val, decreasing = FALSE),]
+df_SDMA_MS023[df_SDMA_MS023$MS023_SDMA_vs_DMSO_SDMA_p.val > 0.05, "group"] <- 'not_significant' 
+df_SDMA_MS023[df_SDMA_MS023$MS023_SDMA_vs_DMSO_SDMA_p.val < 0.05, "group"] <- 'significant' 
+
+```
+
+
+
+```{r}
+ggplot(df_MMA_GSK591, aes(x = GSK591_MMA_vs_DMSO_MMA_diff, y = -log2(GSK591_MMA_vs_DMSO_MMA_p.val), shape = data)) + 
+  geom_point(colour = ifelse(df_MMA_GSK591$GSK591_MMA_vs_DMSO_MMA_p.val > 0.05, '#d4d4d4', '#008837'), size = 1, alpha = 1) + 
+  scale_shape_manual(values=c(0,1)) +
+      geom_text_repel(data = subset(df_MMA_GSK591, group == 'significant')[1:30,], aes(label=name),  size=5, colour = "black", max.overlaps = 100)+
+  geom_vline(xintercept = 0, color = "black", linetype = "dotted", size = 0.5) +
+  geom_hline(yintercept = 4.32, color = "black", linetype = "dotted", size = 0.5) +
+  theme(legend.position = "none",
+        axis.text.y   = element_text(size=8, colour = "black"),
+        axis.text.x   = element_text(size=8, colour = "black"),
+        axis.title.y  = element_text(size=8, colour = "black"),
+        axis.title.x  = element_text(size=8, colour = "black"),
+        panel.background = element_blank(),
+        panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(),
+        axis.line = element_line(colour = "black"),
+        panel.border = element_rect(colour = "black", fill=NA, size=1))+
+  xlim(-17,17)+
+  ylim(0,30)+
+  labs(title = "GSK591 vs. Control MMA IP", 
+       x ="Log2 (GSK591/Control)", y = "-Log2 (p-value)") 
+
+ggplot(df_MMA_MS023, aes(x = MS023_MMA_vs_DMSO_MMA_diff, y = -log2(MS023_MMA_vs_DMSO_MMA_p.val), shape = data)) + 
+  geom_point(colour = ifelse(df_MMA_MS023$MS023_MMA_vs_DMSO_MMA_p.val > 0.05, '#d4d4d4', '#7b3294'), size = 1, alpha = 1) + 
+  scale_shape_manual(values=c(0,1)) +
+      geom_text_repel(data = subset(df_MMA_MS023, group == 'significant')[1:30,], aes(label=name),  size=5, colour = "black", max.overlaps = 100)+
+  geom_vline(xintercept = 0, color = "black", linetype = "dotted", size = 0.5) +
+  geom_hline(yintercept = 4.32, color = "black", linetype = "dotted", size = 0.5) +
+  theme(legend.position = "none",
+        axis.text.y   = element_text(size=8, colour = "black"),
+        axis.text.x   = element_text(size=8, colour = "black"),
+        axis.title.y  = element_text(size=8, colour = "black"),
+        axis.title.x  = element_text(size=8, colour = "black"),
+        panel.background = element_blank(),
+        panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(),
+        axis.line = element_line(colour = "black"),
+        panel.border = element_rect(colour = "black", fill=NA, size=1))+
+  xlim(-17,17)+
+  ylim(0,30)+
+  labs(title = "MS023 vs. Control MMA IP", 
+       x ="Log2 (MS023/Control)", y = "-Log2 (p-value)")  
+
+```
+
+
+```{r}
+ggplot(df_ADMA_GSK591, aes(x = GSK591_ADMA_vs_DMSO_ADMA_diff, y = -log2(GSK591_ADMA_vs_DMSO_ADMA_p.val), shape = data)) + 
+  geom_point(colour = ifelse(df_ADMA_GSK591$GSK591_ADMA_vs_DMSO_ADMA_p.val > 0.05, '#d4d4d4', '#008837'), size = 1, alpha = 1) + 
+  scale_shape_manual(values=c(0,1)) +
+      geom_text_repel(data = subset(df_ADMA_GSK591, group == 'significant')[1:30,], aes(label=name),  size=5, colour = "black", max.overlaps = 100)+
+  geom_vline(xintercept = 0, color = "black", linetype = "dotted", size = 0.5) +
+  geom_hline(yintercept = 4.32, color = "black", linetype = "dotted", size = 0.5) +
+  theme(legend.position = "none",
+        axis.text.y   = element_text(size=8, colour = "black"),
+        axis.text.x   = element_text(size=8, colour = "black"),
+        axis.title.y  = element_text(size=8, colour = "black"),
+        axis.title.x  = element_text(size=8, colour = "black"),
+        panel.background = element_blank(),
+        panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(),
+        axis.line = element_line(colour = "black"),
+        panel.border = element_rect(colour = "black", fill=NA, size=1))+
+  xlim(-17,17)+
+  ylim(0,30)+
+  labs(title = "GSK591 vs. Control ADMA IP", 
+       x ="Log2 (GSK591/Control)", y = "-Log2 (p-value)") 
+
+ggplot(df_ADMA_MS023, aes(x = MS023_ADMA_vs_DMSO_ADMA_diff, y = -log2(MS023_ADMA_vs_DMSO_ADMA_p.val), shape = data)) + 
+  geom_point(colour = ifelse(df_ADMA_MS023$MS023_ADMA_vs_DMSO_ADMA_p.val > 0.05, '#d4d4d4', '#7b3294'), size = 1, alpha = 1) + 
+  scale_shape_manual(values=c(0,1)) +
+      geom_text_repel(data = subset(df_ADMA_MS023, group == 'significant')[1:30,], aes(label=name),  size=5, colour = "black", max.overlaps = 100)+
+  geom_vline(xintercept = 0, color = "black", linetype = "dotted", size = 0.5) +
+  geom_hline(yintercept = 4.32, color = "black", linetype = "dotted", size = 0.5) +
+  theme(legend.position = "none",
+        axis.text.y   = element_text(size=8, colour = "black"),
+        axis.text.x   = element_text(size=8, colour = "black"),
+        axis.title.y  = element_text(size=8, colour = "black"),
+        axis.title.x  = element_text(size=8, colour = "black"),
+        panel.background = element_blank(),
+        panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(),
+        axis.line = element_line(colour = "black"),
+        panel.border = element_rect(colour = "black", fill=NA, size=1))+
+  xlim(-17,17)+
+  ylim(0,30)+
+  labs(title = "MS023 vs. Control ADMA IP", 
+       x ="Log2 (MS023/Control)", y = "-Log2 (p-value)")  
+
+```
+
+
+```{r}
+ggplot(df_SDMA_GSK591, aes(x = GSK591_SDMA_vs_DMSO_SDMA_diff, y = -log2(GSK591_SDMA_vs_DMSO_SDMA_p.val), shape = data)) + 
+  geom_point(colour = ifelse(df_SDMA_GSK591$GSK591_SDMA_vs_DMSO_SDMA_p.val > 0.05, '#d4d4d4', '#008837'), size = 1, alpha = 1) + 
+  scale_shape_manual(values=c(0,1)) +
+      geom_text_repel(data = subset(df_SDMA_GSK591, group == 'significant')[1:30,], aes(label=name),  size=5, colour = "black", max.overlaps = 100)+
+  geom_vline(xintercept = 0, color = "black", linetype = "dotted", size = 0.5) +
+  geom_hline(yintercept = 4.32, color = "black", linetype = "dotted", size = 0.5) +
+  theme(legend.position = "none",
+        axis.text.y   = element_text(size=8, colour = "black"),
+        axis.text.x   = element_text(size=8, colour = "black"),
+        axis.title.y  = element_text(size=8, colour = "black"),
+        axis.title.x  = element_text(size=8, colour = "black"),
+        panel.background = element_blank(),
+        panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(),
+        axis.line = element_line(colour = "black"),
+        panel.border = element_rect(colour = "black", fill=NA, size=1))+
+  xlim(-17,17)+
+  ylim(0,30)+
+  labs(title = "GSK591 vs. Control SDMA IP", 
+       x ="Log2 (GSK591/Control)", y = "-Log2 (p-value)") 
+
+ggplot(df_SDMA_MS023, aes(x = MS023_SDMA_vs_DMSO_SDMA_diff, y = -log2(MS023_SDMA_vs_DMSO_SDMA_p.val), shape = data)) + 
+  geom_point(colour = ifelse(df_SDMA_MS023$MS023_SDMA_vs_DMSO_SDMA_p.val > 0.05, '#d4d4d4', '#7b3294'), size = 1, alpha = 1) + 
+  scale_shape_manual(values=c(0,1)) +
+      geom_text_repel(data = subset(df_SDMA_MS023, group == 'significant')[1:30,], aes(label=name),  size=5, colour = "black", max.overlaps = 100)+
+  geom_vline(xintercept = 0, color = "black", linetype = "dotted", size = 0.5) +
+  geom_hline(yintercept = 4.32, color = "black", linetype = "dotted", size = 0.5) +
+  theme(legend.position = "none",
+        axis.text.y   = element_text(size=8, colour = "black"),
+        axis.text.x   = element_text(size=8, colour = "black"),
+        axis.title.y  = element_text(size=8, colour = "black"),
+        axis.title.x  = element_text(size=8, colour = "black"),
+        panel.background = element_blank(),
+        panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(),
+        axis.line = element_line(colour = "black"),
+        panel.border = element_rect(colour = "black", fill=NA, size=1))+
+  xlim(-17,17)+
+  ylim(0,30)+
+  labs(title = "MS023 vs. Control SDMA IP", 
+       x ="Log2 (MS023/Control)", y = "-Log2 (p-value)")  
+
+```

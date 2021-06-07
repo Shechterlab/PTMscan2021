@@ -1,0 +1,95 @@
+---
+title: "Concatenated PTMscan data to identify unique Rme"
+output:
+  html_document:
+    df_print: paged
+editor_options:
+  chunk_output_type: inline
+---
+
+### Created: 4.6.21
+
+
+### Notes:   
+```{r "setup", include=FALSE}
+#Set the WD here
+knitr::opts_knit$set(root.dir = normalizePath('C:/Users/maxim/OneDrive - Montefiore Medicine/Shechter/Processed_Data/'))
+library(tidyverse)
+
+
+```
+
+```{r Import libraries and Datasets, include = FALSE}
+
+
+Tryp_Input <- readRDS("C:/Users/maxim/OneDrive - Montefiore Medicine/Shechter/Processed_Data/Tryp_03/Input_Tryp_tidy_peptides_TheoMW.RDS")
+Tryp_MMA <- readRDS("C:/Users/maxim/OneDrive - Montefiore Medicine/Shechter/Processed_Data/Tryp_02/MMA_tidy_TheoMW_03.RDS")
+Tryp_ADMA <- readRDS("C:/Users/maxim/OneDrive - Montefiore Medicine/Shechter/Processed_Data/Tryp_02/ADMA_tidy_TheoMW_03.RDS")
+Tryp_SDMA <- readRDS("C:/Users/maxim/OneDrive - Montefiore Medicine/Shechter/Processed_Data/Tryp_02/SDMA_tidy_TheoMW_03.RDS")
+
+Gluc_Input <- readRDS("C:/Users/maxim/OneDrive - Montefiore Medicine/Shechter/Processed_Data/GluC_02/Input_GluC_tidy_TheoMW_03.RDS")
+Gluc_MMA <- readRDS("C:/Users/maxim/OneDrive - Montefiore Medicine/Shechter/Processed_Data/GluC_02/MMA_tidy_TheoMW_03.RDS")
+Gluc_ADMA <- readRDS("C:/Users/maxim/OneDrive - Montefiore Medicine/Shechter/Processed_Data/GluC_02/ADMA_tidy_TheoMW_03.RDS")
+Gluc_SDMA <- readRDS("C:/Users/maxim/OneDrive - Montefiore Medicine/Shechter/Processed_Data/GluC_02/SDMA_tidy_TheoMW_03.RDS")
+
+
+Input_list <- list(Tryp_Input= Tryp_Input, Gluc_Input = Gluc_Input)
+IP_list <- list(Tryp_MMA = Tryp_MMA, Tryp_ADMA = Tryp_ADMA, Tryp_SDMA = Tryp_SDMA, Gluc_MMA = Gluc_MMA, Gluc_ADMA = Gluc_ADMA, Gluc_SDMA = Gluc_SDMA)
+IP_list <- lapply(IP_list, function(x) {x <- x[c(1,12,2,3,9,4,5,6,7,10,11,13,14,15)];x})
+df_list <- c(Input_list, IP_list)
+df <- bind_rows(df_list, .id='df')
+df[grep('Tryp', df$df), 'Protease'] <- 'Trypsin'
+df[grep('Gluc', df$df), 'Protease'] <- 'GluC'
+
+df <- df[grep('R', df$Modifications),]
+
+df <- df[c(6,3,4,5,7,8,11,12,13,14,15,16)]
+
+df$Abundance[is.na(df$Abundance)] <- 0
+
+df_wide <- as.data.frame(df %>%
+  pivot_wider(names_from = ID, values_from = Abundance, values_fill = list(Abundance = 0)))
+
+
+#df_wide$colSum <- 0
+#for (i in (grep('Control_Input_1',colnames(df_wide)):grep('MS023_SDMA_1',colnames(df_wide)))) {
+#  for (j in (1:nrow(df_wide))) {
+#    if (df_wide[j,i] > 0) {
+#      df_wide[j,ncol(df_wide)] <- df_wide[j,ncol(df_wide)] + 1
+#    }
+#  }
+#}
+
+
+#df_wide <- df_wide[df_wide$colSum > 1,]
+```
+
+
+```{r filter for unique values within concatenated data}
+#get max number of modifications to know how many columns you need
+max(str_count(df_wide$Modifications, "_"))
+#create empty columns to store modifications
+Peptide_Modifications <- as.data.frame(df_wide %>% separate(Modifications, c('Modification.Position.1','Modification.Position.2', 'Modification.Position.3', 'Modification.Position.4', 'Modification.Position.5', 'Modification.Position.6', 'Modification.Position.7', 'Modification.Position.8', 'Modification.Position.9', 'Modification.Position.10','Modification.Position.11','Modification.Position.12'), sep = '_', extra = 'merge', fill = 'right'))
+Peptide_Modifications <- Peptide_Modifications[1:grep('Protease',colnames(Peptide_Modifications))]
+
+Peptide_Modifcations_longer <- as.data.frame(Peptide_Modifications %>%
+  pivot_longer(cols= Modification.Position.1:Modification.Position.12, names_to = c('Modification')))
+
+Peptide_Modifcations_longer$value[Peptide_Modifcations_longer$value == ""] <- NA
+
+Peptide_Modifcations_longer_filtered <- Peptide_Modifcations_longer[!is.na(Peptide_Modifcations_longer$value),]
+
+Peptide_Modifcations_longer_filtered <- Peptide_Modifcations_longer_filtered[grep('R', Peptide_Modifcations_longer_filtered$value),]
+
+Peptide_Modifcations_longer_filtered <- Peptide_Modifcations_longer_filtered[order(nchar(Peptide_Modifcations_longer_filtered$Sequence),decreasing = TRUE),]
+
+Peptide_Modifcations_longer_filtered <- Peptide_Modifcations_longer_filtered[!duplicated(Peptide_Modifcations_longer_filtered[c(grep('Accession',colnames(Peptide_Modifcations_longer_filtered)),grep('value',colnames(Peptide_Modifcations_longer_filtered)), grep('Protease',colnames(Peptide_Modifcations_longer_filtered)))]),]
+
+Peptide_Modifcations_longer_filtered$position <- gsub("\\D*(\\d+).*", "\\1", Peptide_Modifcations_longer_filtered$value)
+
+Peptide_Modifcations_longer_filtered <- Peptide_Modifcations_longer_filtered[!Peptide_Modifcations_longer_filtered$Accession == 'ALBU_BOVIN',]
+Peptide_Modifcations_longer_filtered <- Peptide_Modifcations_longer_filtered[!Peptide_Modifcations_longer_filtered$Accession == 'P02768',]
+
+#Peptide_Modifcations_longer_filtered[duplicated(Peptide_Modifcations_longer_filtered[c(grep('Accession',colnames(Peptide_Modifcations_longer_filtered)),grep('value',colnames(Peptide_Modifcations_longer_filtered)))]), 'group'] <- 'Trypsin/GluC'
+#write.csv(Peptide_Modifcations_longer_filtered, 'C:/Users/maxim/OneDrive - Montefiore Medicine/2021 Maron Lehman et al Methylarg PTMScan/Supplemental SheetsAll_MethylArg_Residues_PTMscan_noMinRep_noAbundance_withProtease.csv')
+```

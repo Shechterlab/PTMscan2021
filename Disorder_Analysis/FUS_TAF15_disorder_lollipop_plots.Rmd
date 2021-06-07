@@ -1,0 +1,229 @@
+---
+title: "DISOPRED vs Rme Aundance"
+output:
+  html_document:
+    df_print: paged
+  pdf_document: default
+editor_options:
+  chunk_output_type: inline
+---
+
+### Created: 4.6.21
+
+
+### Notes:   
+```{r "setup", include=FALSE}
+#Set the WD here
+knitr::opts_chunk$set(fig.width=12, fig.height=2) 
+
+knitr::opts_knit$set(root.dir = normalizePath('C:/Users/maxim/OneDrive - Montefiore Medicine/Shechter/Processed_Data/'))
+library(tidyverse)
+library(rio)
+library(ggplot2)
+library(viridisLite)
+library(purrr)
+library(ggrepel)
+library(plotly)
+library(ComplexHeatmap)
+library(circlize)
+library(ggpubr)
+```
+
+```{r}
+FUS <- read.csv('C:\\Users\\maxim\\OneDrive - Montefiore Medicine\\Shechter\\Disorder_Analysis\\FUS_TAF15_Disorder\\FUS_disorder.csv', header = T)
+colnames(FUS) <- c('aa','disorder')
+FUS.m <- as.matrix(FUS[2])
+FUS.m <- t(cbind(FUS.m, as.matrix(FUS[2])))
+#rownames(FUS.m) <- make.names(FUS[[1]], unique=TRUE)
+ht_opt("heatmap_row_names_gp" = gpar(fontsize = 8), 'heatmap_column_names_gp' = gpar(fontsize = 8))
+col_fun = colorRamp2(c(0,1), c('#ffffff', '#000000'))
+Heatmap(FUS.m, name = 'FUS', col = col_fun, border = FALSE, cluster_rows = FALSE, cluster_columns = FALSE, show_column_dend = FALSE, show_row_dend = FALSE, row_names_side = 'left', show_row_names = FALSE, show_column_names = FALSE, show_heatmap_legend = FALSE)
+
+Trypsin <-  read.csv("C:/Users/maxim/OneDrive - Montefiore Medicine/Shechter/Processed_Data/Tryp_02/Trypsin_MMA_ADMA_SDMA_PerResidue.csv")
+df <- Trypsin[Trypsin$Accession == 'P35637',]
+df <- df[grep('me1',df$value),]
+df$location <- str_extract(df$value,"[[:digit:]]+")
+df <- merge(FUS, df, by.x='aa',by.y='location', all=TRUE)
+df[is.na(df)] <- 0
+df$aa <- as.character(df$aa)
+df <- df[c(grep(c('aa|DMSO_1|DMSO_2|DMSO_3|GSK591_1|GSK591_2|GSK591_3|MS023_1|MS023_2|MS023_3'),colnames(df)))]
+df <- reshape2::melt(df)
+df[grep('DMSO',df$variable), 'inhibitor'] <- 'DMSO'
+df[grep('GSK591',df$variable), 'inhibitor'] <- 'GSK591'
+df[grep('MS023',df$variable), 'inhibitor'] <- 'MS023'
+df <- aggregate(.~aa+inhibitor, FUN=mean, data = df)
+df$aa <- as.numeric(as.character(df$aa))
+df <- df[order(df$aa),]
+df <- df[df$inhibitor == 'DMSO',]
+
+ggplot(df, aes(x=aa, y=value, size=value, fill=inhibitor)) +
+  geom_point(alpha=1, shape=21) +
+   geom_segment( aes(x=aa, xend=aa, y=0, yend=value), size = 1)+
+  scale_y_discrete(breaks=NULL)+
+    scale_x_discrete(breaks=NULL)+
+  scale_size(range = c(.1, 10), name="") +
+  scale_fill_manual(values=c('#bababa'))+
+  theme(legend.position = "none",
+        axis.text.y   = element_blank(),
+        axis.text.x   = element_blank(),
+        axis.title.y  = element_blank(),
+        axis.title.x  = element_blank(),
+        panel.background = element_blank(),
+        panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(),
+        axis.line = element_blank())
+
+ggplot(df, aes(x=aa, y=value, size=value, fill=inhibitor)) +
+  geom_point(alpha=1, shape=21) +
+   geom_segment( aes(x=aa, xend=aa, y=0, yend=value), size = 1)+
+  scale_y_discrete(breaks=NULL)+
+    scale_x_discrete(breaks=NULL)+
+  scale_size(range = c(.1, 10), name="") +
+  scale_fill_manual(values=c('#bababa'))+
+  theme(legend.position = "right",
+        axis.text.y   = element_blank(),
+        axis.text.x   = element_blank(),
+        axis.title.y  = element_blank(),
+        axis.title.x  = element_blank(),
+        panel.background = element_blank(),
+        panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(),
+        axis.line = element_blank())
+```
+
+```{r}
+TAF15 <- read.csv('C:\\Users\\maxim\\OneDrive - Montefiore Medicine\\Shechter\\Disorder_Analysis\\FUS_TAF15_Disorder\\TAF15_disorder.csv', header = T)
+colnames(TAF15) <- c('aa','disorder')
+TAF15.m <- as.matrix(TAF15[2])
+TAF15.m <- t(cbind(TAF15.m, as.matrix(TAF15[2])))
+#rownames(TAF15.m) <- make.names(TAF15[[1]], unique=TRUE)
+ht_opt("heatmap_row_names_gp" = gpar(fontsize = 8), 'heatmap_column_names_gp' = gpar(fontsize = 8))
+col_fun = colorRamp2(c(0,1), c('#ffffff', '#000000'))
+Heatmap(TAF15.m, name = 'TAF15', col = col_fun, border = FALSE, cluster_rows = FALSE, cluster_columns = FALSE, show_column_dend = FALSE, show_row_dend = FALSE, row_names_side = 'left', show_row_names = FALSE, show_column_names = FALSE, show_heatmap_legend = FALSE)
+
+Trypsin <-  read.csv("C:/Users/maxim/OneDrive - Montefiore Medicine/Shechter/Processed_Data/Tryp_02/Trypsin_MMA_ADMA_SDMA_PerResidue.csv")
+df <- Trypsin[Trypsin$Accession == 'Q92804',]
+df <- df[grep('me1',df$value),]
+df$location <- str_extract(df$value,"[[:digit:]]+")
+df <- merge(TAF15, df, by.x='aa',by.y='location', all=TRUE)
+df[is.na(df)] <- 0
+df$aa <- as.character(df$aa)
+df <- df[c(grep(c('aa|DMSO_1|DMSO_2|DMSO_3|GSK591_1|GSK591_2|GSK591_3|MS023_1|MS023_2|MS023_3'),colnames(df)))]
+df <- reshape2::melt(df)
+df[grep('DMSO',df$variable), 'inhibitor'] <- 'DMSO'
+df[grep('GSK591',df$variable), 'inhibitor'] <- 'GSK591'
+df[grep('MS023',df$variable), 'inhibitor'] <- 'MS023'
+df <- aggregate(.~aa+inhibitor, FUN=mean, data = df)
+df$aa <- as.numeric(as.character(df$aa))
+df <- df[order(df$aa),]
+df <- df[df$inhibitor == 'DMSO',]
+
+ggplot(df, aes(x=aa, y=value, size=value, fill=inhibitor)) +
+  geom_point(alpha=1, shape=21) +
+   geom_segment( aes(x=aa, xend=aa, y=0, yend=value), size = 1)+
+  scale_y_discrete(breaks=NULL)+
+    scale_x_discrete(breaks=NULL)+
+  scale_size(range = c(.1, 10), name="") +
+  scale_fill_manual(values=c('#bababa'))+
+  theme(legend.position = "none",
+        axis.text.y   = element_blank(),
+        axis.text.x   = element_blank(),
+        axis.title.y  = element_blank(),
+        axis.title.x  = element_blank(),
+        panel.background = element_blank(),
+        panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(),
+        axis.line = element_blank())
+```
+
+```{r}
+FUS <- read.csv('C:\\Users\\maxim\\OneDrive - Montefiore Medicine\\Shechter\\Disorder_Analysis\\FUS_TAF15_Disorder\\FUS_disorder.csv', header = T)
+colnames(FUS) <- c('aa','disorder')
+FUS.m <- as.matrix(FUS[2])
+FUS.m <- t(cbind(FUS.m, as.matrix(FUS[2])))
+#rownames(FUS.m) <- make.names(FUS[[1]], unique=TRUE)
+ht_opt("heatmap_row_names_gp" = gpar(fontsize = 8), 'heatmap_column_names_gp' = gpar(fontsize = 8))
+col_fun = colorRamp2(c(0,1), c('#ffffff', '#000000'))
+Heatmap(FUS.m, name = 'FUS', col = col_fun, border = FALSE, cluster_rows = FALSE, cluster_columns = FALSE, show_column_dend = FALSE, show_row_dend = FALSE, row_names_side = 'left', show_row_names = FALSE, show_column_names = FALSE, show_heatmap_legend = FALSE)
+
+Trypsin <-  read.csv("C:/Users/maxim/OneDrive - Montefiore Medicine/Shechter/Processed_Data/Tryp_02/Trypsin_MMA_ADMA_SDMA_PerResidue.csv")
+df <- Trypsin[Trypsin$Accession == 'P35637',]
+df <- df[grep('me2',df$value),]
+df$location <- str_extract(df$value,"[[:digit:]]+")
+df <- merge(FUS, df, by.x='aa',by.y='location', all=TRUE)
+df[is.na(df)] <- 0
+df$aa <- as.character(df$aa)
+df <- df[c(grep(c('aa|DMSO_1|DMSO_2|DMSO_3|GSK591_1|GSK591_2|GSK591_3|MS023_1|MS023_2|MS023_3'),colnames(df)))]
+df <- reshape2::melt(df)
+df[grep('DMSO',df$variable), 'inhibitor'] <- 'DMSO'
+df[grep('GSK591',df$variable), 'inhibitor'] <- 'GSK591'
+df[grep('MS023',df$variable), 'inhibitor'] <- 'MS023'
+df <- aggregate(.~aa+inhibitor, FUN=mean, data = df)
+df$aa <- as.numeric(as.character(df$aa))
+df <- df[order(df$aa),]
+df <- df[df$inhibitor == 'DMSO',]
+
+ggplot(df, aes(x=aa, y=value, size=value, fill=inhibitor)) +
+  geom_point(alpha=1, shape=21) +
+   geom_segment( aes(x=aa, xend=aa, y=0, yend=value), size = 1)+
+  scale_y_discrete(breaks=NULL)+
+    scale_x_discrete(breaks=NULL)+
+  scale_size(range = c(.1, 10), name="") +
+  scale_fill_manual(values=c('#bababa'))+
+  theme(legend.position = "none",
+        axis.text.y   = element_blank(),
+        axis.text.x   = element_blank(),
+        axis.title.y  = element_blank(),
+        axis.title.x  = element_blank(),
+        panel.background = element_blank(),
+        panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(),
+        axis.line = element_blank())
+```
+
+```{r}
+TAF15 <- read.csv('C:\\Users\\maxim\\OneDrive - Montefiore Medicine\\Shechter\\Disorder_Analysis\\FUS_TAF15_Disorder\\TAF15_disorder.csv', header = T)
+colnames(TAF15) <- c('aa','disorder')
+TAF15.m <- as.matrix(TAF15[2])
+TAF15.m <- t(cbind(TAF15.m, as.matrix(TAF15[2])))
+#rownames(TAF15.m) <- make.names(TAF15[[1]], unique=TRUE)
+ht_opt("heatmap_row_names_gp" = gpar(fontsize = 8), 'heatmap_column_names_gp' = gpar(fontsize = 8))
+col_fun = colorRamp2(c(0,1), c('#ffffff', '#000000'))
+Heatmap(TAF15.m, name = 'TAF15', col = col_fun, border = FALSE, cluster_rows = FALSE, cluster_columns = FALSE, show_column_dend = FALSE, show_row_dend = FALSE, row_names_side = 'left', show_row_names = FALSE, show_column_names = FALSE, show_heatmap_legend = FALSE)
+
+Trypsin <-  read.csv("C:/Users/maxim/OneDrive - Montefiore Medicine/Shechter/Processed_Data/Tryp_02/Trypsin_MMA_ADMA_SDMA_PerResidue.csv")
+df <- Trypsin[Trypsin$Accession == 'Q92804',]
+df <- df[grep('me2',df$value),]
+df$location <- str_extract(df$value,"[[:digit:]]+")
+df <- merge(TAF15, df, by.x='aa',by.y='location', all=TRUE)
+df[is.na(df)] <- 0
+df$aa <- as.character(df$aa)
+df <- df[c(grep(c('aa|DMSO_1|DMSO_2|DMSO_3|GSK591_1|GSK591_2|GSK591_3|MS023_1|MS023_2|MS023_3'),colnames(df)))]
+df <- reshape2::melt(df)
+df[grep('DMSO',df$variable), 'inhibitor'] <- 'DMSO'
+df[grep('GSK591',df$variable), 'inhibitor'] <- 'GSK591'
+df[grep('MS023',df$variable), 'inhibitor'] <- 'MS023'
+df <- aggregate(.~aa+inhibitor, FUN=mean, data = df)
+df$aa <- as.numeric(as.character(df$aa))
+df <- df[order(df$aa),]
+df <- df[df$inhibitor == 'DMSO',]
+
+ggplot(df, aes(x=aa, y=value, size=value, fill=inhibitor)) +
+  geom_point(alpha=1, shape=21) +
+   geom_segment( aes(x=aa, xend=aa, y=0, yend=value), size = 1)+
+  scale_y_discrete(breaks=NULL)+
+    scale_x_discrete(breaks=NULL)+
+  scale_size(range = c(.1, 10), name="") +
+  scale_fill_manual(values=c('#bababa'))+
+  theme(legend.position = "none",
+        axis.text.y   = element_blank(),
+        axis.text.x   = element_blank(),
+        axis.title.y  = element_blank(),
+        axis.title.x  = element_blank(),
+        panel.background = element_blank(),
+        panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(),
+        axis.line = element_blank()) 
+
+Heatmap(TAF15.m, name = 'TAF15', col = col_fun, border = FALSE, cluster_rows = FALSE, cluster_columns = FALSE, show_column_dend = FALSE, show_row_dend = FALSE, row_names_side = 'left', show_row_names = FALSE, show_column_names = FALSE, show_heatmap_legend = TRUE)
+```

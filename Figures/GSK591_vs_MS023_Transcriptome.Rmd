@@ -1,0 +1,66 @@
+---
+title: "GSK591_vs_MS023 Transcriptome"
+output:
+  html_document:
+    df_print: paged
+  pdf_document: default
+---
+```{r "setup", include=FALSE}
+library(tidyverse)
+library(ggrepel)
+library(ggpubr)
+```
+
+
+```{r}
+#load in the dataframes
+RNAseq_GSK591 <-  read.table("C:\\Users\\maxim\\Dropbox (EinsteinMed)\\CloudStation\\PRMT\\RNAseq\\Dataframes\\completefile_Control_vs_GSK591_res.05_FC0_genename.txt", header = TRUE)
+RNAseq_GSK591 <- RNAseq_GSK591[!is.na(RNAseq_GSK591$padj),]
+RNAseq_GSK591 <- RNAseq_GSK591[RNAseq_GSK591$padj < 0.05,]
+RNAseq_GSK591[RNAseq_GSK591$padj == 0, "padj"] <- 1e-300
+RNAseq_GSK591 <- RNAseq_GSK591[order(RNAseq_GSK591$padj, decreasing = FALSE),]
+
+
+
+RNAseq_MS023 <-  read.table("C:\\Users\\maxim\\Dropbox (EinsteinMed)\\CloudStation\\PRMT\\RNAseq\\Dataframes\\completefile_Control_vs_MS023_res.05_FC0_genename.txt", header = TRUE)
+RNAseq_MS023 <- RNAseq_MS023[!is.na(RNAseq_MS023$padj),]
+RNAseq_MS023 <- RNAseq_MS023[RNAseq_MS023$padj < 0.05,]
+RNAseq_MS023[RNAseq_MS023$padj == 0, "padj"] <- 1e-300
+RNAseq_MS023 <- RNAseq_MS023[order(RNAseq_MS023$padj, decreasing = FALSE),]
+
+```
+
+
+```{r}
+df <- merge(RNAseq_GSK591, RNAseq_MS023, by = 'geneid')
+```
+
+```{r}
+
+names <- c('FGG', 'COL1A1','FOX1','FOXA3','BAMBI','HLA-DMB','XBP1','XDH','COL16A1','TNFRSF9','FBN1','BCL2A1','CDH4','EGFR')
+df$group <- ifelse(grepl(paste(names,collapse='|'), df$genename.x, ignore.case = TRUE), "yes", "no")
+
+
+ggplot(df, aes(x = log2FoldChange.x, y = log2FoldChange.y )) + 
+  geom_point(colour = '#e66101', size = 1, alpha = 1, shape = 1) + 
+  geom_text_repel(data = subset(df, group == 'yes'), aes(label=genename.x),  size=2, colour = "black", max.overlaps = 100)+
+  geom_vline(xintercept = 0, color = "black", linetype = "dotted", size = 0.5) +
+  geom_hline(yintercept = 0, color = "black", linetype = "dotted", size = 0.5) +
+  geom_smooth(method=lm,   # Add linear regression lines
+              se=FALSE, fullrange = TRUE, color = 'black') + 
+  stat_cor(method = 'spearman')+
+  theme(legend.position = "none",
+        axis.text.y   = element_text(size=12, colour = "black"),
+        axis.text.x   = element_text(size=12, colour = "black"),
+        axis.title.y  = element_text(size=12, colour = "black"),
+        axis.title.x  = element_text(size=12, colour = "black"),
+        panel.background = element_blank(),
+        panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(),
+        axis.line = element_line(colour = "black"),
+        panel.border = element_rect(colour = "black", fill=NA, size=1))+
+  xlim(-6.5,6.5)+
+  ylim(-6.5,6.5)+
+  labs(title = "GSK591 Transcriptome vs. Proteome", 
+       x ="Transcriptome Log2FC", y = "Proteome Log2FC") 
+```

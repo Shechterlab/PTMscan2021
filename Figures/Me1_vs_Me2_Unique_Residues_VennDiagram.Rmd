@@ -1,0 +1,63 @@
+---
+title: "Peptide information"
+output:
+  pdf_document: default
+  html_notebook: default
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
+
+
+---
+title: "Me1 vs Me2 unique residues"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+editor_options:
+  chunk_output_type: inline
+---
+
+### Created: 4.6.21
+
+
+### Notes:
+
+
+```{r "setup", include=FALSE}
+#Set the WD here
+knitr::opts_chunk$set(fig.width=12, fig.height=8) 
+knitr::opts_knit$set(root.dir = normalizePath('C:\\Users\\maxim\\OneDrive - Montefiore Medicine\\Shechter\\DEP\\Notebooks\\Combined\\ALL\\'))
+library(tidyverse)
+library(VennDiagram)
+
+```
+
+```{r}
+df <- read.csv('C:\\Users\\maxim\\OneDrive - Montefiore Medicine\\Shechter\\DEP\\Notebooks\\Combined\\ALL\\PTMscan_MethylArg_Residues_noMinRep_noAbundance.csv')
+me1 <- df[grep('me1',df$value),]
+me1$identity <- paste(me1$Accession, me1$position, sep ='_')
+me2 <- df[grep('me2',df$value),]
+me2$identity <- paste(me2$Accession, me2$position, sep ='_')
+
+```
+
+
+
+```{r}
+data<- list(me1 = me1, me2 = me2)
+
+plt <- venn.diagram(x = list(data[[1]]$identity, data[[2]]$identity), category.names = c("me1" , "me2"), filename = NULL, fill = c('#bababa','#bababa'), euler.d= TRUE, scaled=TRUE, output = F)
+
+##ggsave(plt, file= paste('InputChromatin_GSK_vs_DMSO_PTMscan', 'pdf' ,sep="."), device ='pdf', width = 15, height = 15, dpi = 300)
+
+overlap <- calculate.overlap(x = list(data[[1]]$name, data[[2]]$name))
+
+##write.csv(overlap$a3, 'InputChromatin_GSK_vs_DMSO_PTMscan_common.csv')
+
+plot(grid::grid.draw(plt), x= 1, y= 1)
+
+```
+

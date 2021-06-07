@@ -1,0 +1,245 @@
+---
+title: "Trypsin IP Peptide and Protein Results"
+output: html_notebook
+editor_options: 
+  chunk_output_type: console
+---
+
+Created: 09.29.20
+Modified for Trypsin: 12.26.20
+The goal of this notebook is to clean up the Tryp IP Results for tidy data. 
+
+Note: this workbook creates results using Originial Data (Hunt Lab), Replicate 2 and Replicate 1 (Garcia)
+
+
+```{r Import libraries and Datasets}
+library(tidyverse)
+library(rio)
+library(ggplot2)
+library(viridisLite)
+
+
+Peptide <- import("C:/Users/maxim/OneDrive - Montefiore Medicine/Shechter/PD_Results_Jan2021/OddReplicates_PeptideGroups.txt")
+PSMs <- import("C:/Users/maxim/OneDrive - Montefiore Medicine/Shechter/PD_Results_Jan2021/OddReplicates_PSMs.txt")
+FileID <- import("C:/Users/maxim/OneDrive - Montefiore Medicine/Shechter/PD_Results_Jan2021/OddReplicates_InputFiles.txt")
+
+protein <- readRDS("C:/Users/maxim/OneDrive - Montefiore Medicine/Shechter/Processed_Data/All_Protein_Gene.RDS")
+
+```
+
+```{r Column Labeling}
+# Adjusts column labels (Removes spaces and removes Found In columns and Abundance by peptide count)
+Peptide <- Peptide %>% 
+  rename_all(~str_replace_all(., "\\W", ".")) %>% 
+  select(-contains("Found.in."), -contains("Abundances.Count"))
+
+PSMs <- PSMs %>% 
+rename_all(~str_replace_all(., "\\W", ".")) %>% 
+  filter(!str_detect(Modifications, "N\\-Term\\(Methyl\\)"),
+         !str_detect(Modifications, "N\\-Term\\(Dimethyl\\)")) %>% 
+  filter(Isolation.Interference.in.Percent < 35) %>% 
+select(Sequence, Position.in.Protein, Modifications, Master.Protein.Accessions, Theo.MHplus.in.Da) 
+  
+  
+
+```
+
+
+```{r Adjust the Labels from the PSM, echo = FALSE}
+PSM_Mod <- PSMs 
+
+# remove carbamidomethyl (searched as fixed; so assumed on all Cys)
+PSM_Mod$Modifications <- gsub("C[0-9]{1,2}\\(Carbamidomethyl)\\;{0,1}\\s{0,1}","",PSM_Mod$Modifications,fixed = FALSE)
+
+# Relabel Acetyl (nterm)
+PSM_Mod$Modifications <- gsub("N-Term\\(Prot\\)\\(Acetyl\\)\\;{0,1}\\s{0,1}", "ntermAcetyl_", PSM_Mod$Modifications, fixed = FALSE)
+
+# Relabel Acetyl 
+PSM_Mod$Modifications <- gsub("\\(Acetyl\\)\\;{0,1}\\s{0,1}", "acetyl_", PSM_Mod$Modifications, fixed = FALSE)
+
+# Relabel Oxidation                            
+PSM_Mod$Modifications <- gsub("M[0-9]{1,2}\\(Oxidation\\)\\;{0,1}\\s{0,1}", "",PSM_Mod$Modifications, fixed = FALSE)
+
+# Relabel Methylation                            
+PSM_Mod$Modifications <- gsub("\\(Methyl\\)\\;{0,1}\\s{0,1}", "me1_",PSM_Mod$Modifications, fixed = FALSE)
+
+# Relabel Dimethylation                            
+PSM_Mod$Modifications <- gsub("\\(Dimethyl\\)\\;{0,1}\\s{0,1}", "me2_",PSM_Mod$Modifications, fixed = FALSE)
+
+# Remove final _                           
+PSM_Mod$Modifications <- gsub("\\_$", "",PSM_Mod$Modifications, fixed = FALSE)
+
+# Removes modifications for the join below
+Peptide <- Peptide %>% 
+  select(-contains("Modifications"), -contains("Modifications.in.Master.Proteins"))
+
+# Note: PSM with variable mod locations will form the same Peptide Group for quant - this will be multiplied when the mods are re-assigned. Selecting the highest scoring Delta Mod here for each Peptide/Mass combination.  
+PSM_Mod <- PSM_Mod %>% unique()
+
+# Merge table from PSM_Mod and Peptide
+# Filters for high confidence peptides
+# Number of PSM per peptide is not filtered since filtering will happen later prior to imputation. 
+Peptide_Mod <- PSM_Mod %>%
+  unique() %>% 
+  left_join(x = Peptide, y = ., by = c('Master.Protein.Accessions', 'Sequence', "Position.in.Protein", 'Theo.MHplus.in.Da')) %>% 
+  # Number.of.PSMs > 1,
+  filter(Confidence == "High") %>% 
+  select(-contains("FDR"), -contains("Delta"), -contains("PEP"), -contains(".y"))
+  
+```
+
+```{r }
+# Makes data Long Format and creates a file ID (Inhibitor_Replicate_IP) and cleans up columns
+Peptide_long <- Peptide_Mod %>% 
+  select(Sequence, Master.Protein.Accessions, Master.Protein.Descriptions, Modifications, Theo.MHplus.in.Da, Sequence.Length, Position.in.Protein, Sequence.Length, contains("Abundance.F")) %>% 
+  pivot_longer(cols = contains("Abundance.F"), names_to = "temp", 
+               values_to = "Abundance", values_drop_na = FALSE) %>%  
+  separate(temp, c("temp", "File.ID", "temp2", "Inhibitor", "temp3", "Replicate", "IP")) %>% 
+  select(-contains("temp")) %>% 
+  mutate(ID = paste(Inhibitor, IP, Replicate, sep = "_")) %>% 
+  select(File.ID, Master.Protein.Accessions, Master.Protein.Descriptions, Sequence, Modifications, Position.in.Protein, Sequence.Length, Theo.MHplus.in.Da, Abundance, Inhibitor, Replicate, IP, ID)
+
+# Removes OS=HomoSapien from Description
+Peptide_long$Master.Protein.Descriptions <- unlist(lapply(Peptide_long$Master.Protein.Descriptions, function(x){
+  unlist(strsplit(x, split = "OS=", fixed = TRUE))[1]}))
+  
+# Rename two columns for ease
+Peptide_long <- Peptide_long %>% 
+  rename(Description = Master.Protein.Descriptions,
+         Accession = Master.Protein.Accessions)
+# 	RFGQGGAGPVGGQGPRGMGPGTPAGYGRGREE
+
+Peptide_long$Modifications <- gsub("^$", NA, Peptide_long$Modifications , fixed = FALSE)
+
+Peptide_long <- Peptide_long %>% 
+  group_by(File.ID, Accession, Description, Sequence, Modifications, Position.in.Protein, Sequence.Length, Inhibitor, Replicate, IP, ID, Theo.MHplus.in.Da) %>% 
+  summarize(Abundance = sum(Abundance, na.rm = TRUE)) %>% 
+  ungroup()
+
+Peptide_long[Peptide_long == 0] <- NA
+
+Peptide_long$Abundance <- as.numeric(Peptide_long$Abundance)
+```
+
+```{r}
+Peptide_long <- left_join(Peptide_long, protein, by = NULL)
+```
+
+```{r fix protein sequence, echo = FALSE}
+# This series replaces the modification location from peptide to protein based numbering. 
+
+## It relies upon the "_" found between modification sites. 
+
+#There are 11 positions as that was currently the longest number of modifications. 
+
+# Peptide_long$number.of._ <- str_count(Peptide_long$Modifications, "_")
+# 10 is max number of "_" thus 11 modifications
+
+#split modifications by underscore into new columns
+Peptide_Modifications <- as.data.frame(Peptide_long %>% separate(Modifications, c('Modification.Position.1','Modification.Position.2', 'Modification.Position.3', 'Modification.Position.4', 'Modification.Position.5', 'Modification.Position.6', 'Modification.Position.7', 'Modification.Position.8', 'Modification.Position.9', 'Modification.Position.10', 'Modification.Position.11'), sep = '_', extra = 'merge', fill = 'right'))
+
+#isolate new modification columns into separate dataframe 
+Modification.a <- Peptide_Modifications[grep("^Modification",colnames(Peptide_Modifications))]
+
+#extract integer from string
+Modification.b <- sapply(Modification.a[1:11], function(x) str_extract(x,"[[:digit:]]+"))
+
+#if no modification present then set as 0
+Modification.b[is.na(Modification.b)] <- 0
+
+#convert to dataframe
+Modification.b <- as.data.frame(Modification.b)
+
+#use sapply to ensure values are integers
+Modification.b <- sapply(Modification.b[1:11], as.integer)
+
+# Rename the Integer Columns
+colnames(Modification.b) <- paste("Integer.", 1:11, sep="")
+
+#append the new modification positions to the end of the peptide dataframe 
+Peptide_Modification.a <- cbind(Peptide_Modifications, Modification.b)
+  
+#to expedite the loop below you can convert it into a function and use s or l apply
+#this loop takes x number of columns appended onto the peptide dataframe and then calculates the modification position for each new column
+for (i in (ncol(Peptide_Modifications)+1):ncol(Peptide_Modification.a)) {
+  for (j in 1:nrow(Peptide_Modification.a)) {
+    if (Peptide_Modification.a[j,i] > 0) {
+    Peptide_Modification.a[j,i] <- Peptide_Modification.a[j,]$Position.in.Protein + Peptide_Modification.a[j,i] -1
+    }
+  }
+}
+
+# Converts from integer to character
+Peptide_Modification.a$Integer.1 <- as.character(Peptide_Modification.a$Integer.1)
+Peptide_Modification.a$Integer.2 <- as.character(Peptide_Modification.a$Integer.2)
+Peptide_Modification.a$Integer.3 <- as.character(Peptide_Modification.a$Integer.3)
+Peptide_Modification.a$Integer.4 <- as.character(Peptide_Modification.a$Integer.4)
+Peptide_Modification.a$Integer.5 <- as.character(Peptide_Modification.a$Integer.5)
+Peptide_Modification.a$Integer.6 <- as.character(Peptide_Modification.a$Integer.6)
+Peptide_Modification.a$Integer.7 <- as.character(Peptide_Modification.a$Integer.7)
+Peptide_Modification.a$Integer.8 <- as.character(Peptide_Modification.a$Integer.8)
+Peptide_Modification.a$Integer.9 <- as.character(Peptide_Modification.a$Integer.9)
+Peptide_Modification.a$Integer.10 <- as.character(Peptide_Modification.a$Integer.10)
+Peptide_Modification.a$Integer.11 <- as.character(Peptide_Modification.a$Integer.11)
+
+# Replace Digits with Protein Position
+Peptide_Modification.a$Position.1 <- str_replace(Peptide_Modification.a$Modification.Position.1, "[[:digit:]]+", Peptide_Modification.a$Integer.1)
+Peptide_Modification.a$Position.2 <- str_replace(Peptide_Modification.a$Modification.Position.2, "[[:digit:]]+", Peptide_Modification.a$Integer.2)
+Peptide_Modification.a$Position.3 <- str_replace(Peptide_Modification.a$Modification.Position.3, "[[:digit:]]+", Peptide_Modification.a$Integer.3)
+Peptide_Modification.a$Position.4 <- str_replace(Peptide_Modification.a$Modification.Position.4, "[[:digit:]]+", Peptide_Modification.a$Integer.4)
+Peptide_Modification.a$Position.5 <- str_replace(Peptide_Modification.a$Modification.Position.5, "[[:digit:]]+", Peptide_Modification.a$Integer.5)
+Peptide_Modification.a$Position.6 <- str_replace(Peptide_Modification.a$Modification.Position.6, "[[:digit:]]+", Peptide_Modification.a$Integer.6)
+Peptide_Modification.a$Position.7 <- str_replace(Peptide_Modification.a$Modification.Position.7, "[[:digit:]]+", Peptide_Modification.a$Integer.7)
+Peptide_Modification.a$Position.8 <- str_replace(Peptide_Modification.a$Modification.Position.8, "[[:digit:]]+", Peptide_Modification.a$Integer.8)
+Peptide_Modification.a$Position.9 <- str_replace(Peptide_Modification.a$Modification.Position.9, "[[:digit:]]+", Peptide_Modification.a$Integer.9)
+Peptide_Modification.a$Position.10 <- str_replace(Peptide_Modification.a$Modification.Position.10, "[[:digit:]]+", Peptide_Modification.a$Integer.10)
+Peptide_Modification.a$Position.11 <- str_replace(Peptide_Modification.a$Modification.Position.11, "[[:digit:]]+", Peptide_Modification.a$Integer.11)
+
+#Re-piece the Modifications Column
+Peptide_Modification.a <- Peptide_Modification.a %>% 
+  mutate(Protein.Modifications = paste(Position.1, Position.2, Position.3, Position.4, Position.5, Position.6, Position.7, Position.8, Position.9, Position.10, Position.11, sep = "_"))
+
+# Remove extra NA
+Peptide_Modification.a$Protein.Modifications <- unlist(lapply(Peptide_Modification.a$Protein.Modifications, function(x){
+  unlist(strsplit(x, split = "_NA", fixed = TRUE))[1]}))
+
+# Remove NA for unmodified peptides
+Peptide_Modification.a$Protein.Modifications <- gsub("NA", "", Peptide_Modification.a$Protein.Modifications, fixed = FALSE)
+
+# Filters peptides for PSM with methylation placed at c-term of peptides
+# Note: There is always a missed cleavage in all peptides with a c-term placed modification and the correctly placed mod is also detected. 
+#Peptide_Modification.a <- Peptide_Modification.a %>% 
+ # rowwise() %>% 
+ # filter(!Sequence.Length %in% Integer.1:Integer.11)
+
+# Renames columns and creates columns for the peptide position in protein
+Peptide_long.2 <- Peptide_Modification.a %>% 
+  rename(Modifications = Protein.Modifications) %>% 
+  mutate(Begin.Pos = Position.in.Protein,
+         End.Pos = Position.in.Protein + Sequence.Length - 1) %>% 
+  select(-contains("Modification.Position"), -contains("Integer."), -contains("Position."))
+```
+
+
+```{r }
+#Break Data into IP specific data chunks
+MMA <- Peptide_long.2 %>% 
+  filter(IP == "MMA")
+
+SDMA <- Peptide_long.2 %>% 
+  filter(IP == "SDMA")
+
+ADMA <- Peptide_long.2 %>% 
+  filter(IP == "ADMA")
+
+```
+
+```{r Save the individual files}
+saveRDS(MMA, "F:/Shechter/Processed_Data/Tryp_02/MMA_tidy_TheoMW_03.RDS")
+saveRDS(SDMA, "F:/Shechter/Processed_Data/Tryp_02/SDMA_tidy_TheoMW_03.RDS")
+saveRDS(ADMA, "F:/Shechter/Processed_Data/Tryp_02/ADMA_tidy_TheoMW_03.RDS")
+
+```
+
+
+

@@ -1,0 +1,80 @@
+---
+title: "GSK591_MS023_volcano"
+output:
+  html_document:
+    df_print: paged
+  pdf_document: default
+---
+```{r "setup", include=FALSE}
+library(tidyverse)
+library(ggrepel)
+```
+
+
+```{r}
+#load in the dataframes
+GSK591 <-  read.table("C:\\Users\\maxim\\Dropbox (EinsteinMed)\\CloudStation\\PRMT\\RNAseq\\Dataframes\\completefile_Control_vs_GSK591_res.05_FC0_genename.txt", header = TRUE)
+GSK591 <- GSK591[!is.na(GSK591$padj),]
+GSK591[GSK591$padj > 0.05, "group"] <- 'not_significant' 
+GSK591[GSK591$padj < 0.05, "group"] <- 'significant' 
+GSK591[GSK591$padj == 0, "padj"] <- 1e-300
+GSK591 <- GSK591[order(GSK591$padj, decreasing = FALSE),]
+
+
+
+MS023 <-  read.table("C:\\Users\\maxim\\Dropbox (EinsteinMed)\\CloudStation\\PRMT\\RNAseq\\Dataframes\\completefile_Control_vs_MS023_res.05_FC0_genename.txt", header = TRUE)
+MS023 <- MS023[!is.na(MS023$padj),]
+MS023[MS023$padj > 0.05, "group"] <- 'not_significant' 
+MS023[MS023$padj < 0.05, "group"] <- 'significant' 
+MS023[MS023$padj == 0, "padj"] <- 1e-300
+MS023 <- MS023[order(MS023$padj, decreasing = FALSE),]
+
+```
+
+
+
+```{r Volcano Plots for Concatenated Trysin per AminoAcid, echo = FALSE}
+ggplot(GSK591, aes(x = log2FoldChange, y = -log10(padj))) + 
+  geom_point(colour = ifelse(GSK591$padj > 0.05, '#d4d4d4', '#008837'), size = 1, alpha = 1, shape = 1) + 
+      geom_text_repel(data = subset(GSK591, group == 'significant')[1:30,], aes(label=genename),  size=2, colour = "black", max.overlaps = 100)+
+  geom_vline(xintercept = 0, color = "black", linetype = "dotted", size = 0.5) +
+  geom_hline(yintercept = 1.301, color = "black", linetype = "dotted", size = 0.5) +
+  theme(legend.position = "none",
+        axis.text.y   = element_text(size=12, colour = "black"),
+        axis.text.x   = element_text(size=12, colour = "black"),
+        axis.title.y  = element_text(size=12, colour = "black"),
+        axis.title.x  = element_text(size=12, colour = "black"),
+        panel.background = element_blank(),
+        panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(),
+        axis.line = element_line(colour = "black"),
+        panel.border = element_rect(colour = "black", fill=NA, size=1))+
+  xlim(-7.5,7.5)+
+  ylim(0,300)+
+  labs(title = "GSK591 Transcriptome", 
+       subtitle = "Trypsin Protein based results", 
+       x ="Log2 (GSK591/Control)", y = "-Log10 (Padj)") 
+
+
+ggplot(MS023, aes(x = log2FoldChange, y = -log10(padj))) + 
+  geom_point(colour = ifelse(MS023$padj > 0.05, '#d4d4d4', '#7b3294'), size = 1, alpha = 1, shape = 1) + 
+      geom_text_repel(data = subset(MS023, group == 'significant')[1:30,], aes(label=genename),  size=2, colour = "black", max.overlaps = 100)+
+  geom_vline(xintercept = 0, color = "black", linetype = "dotted", size = 0.5) +
+  geom_hline(yintercept = 1.301, color = "black", linetype = "dotted", size = 0.5) +
+  theme(legend.position = "none",
+        axis.text.y   = element_text(size=12, colour = "black"),
+        axis.text.x   = element_text(size=12, colour = "black"),
+        axis.title.y  = element_text(size=12, colour = "black"),
+        axis.title.x  = element_text(size=12, colour = "black"),
+        panel.background = element_blank(),
+        panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(),
+        axis.line = element_line(colour = "black"),
+        panel.border = element_rect(colour = "black", fill=NA, size=1))+
+  xlim(-7.5,7.5)+
+  ylim(0,300)+
+  labs(title = "MS023 Transcriptome", 
+       subtitle = "Trypsin Protein based results", 
+       x ="Log2 (MS023/Control)", y = "-Log10 (Padj)") 
+
+```

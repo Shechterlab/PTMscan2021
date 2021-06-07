@@ -1,0 +1,170 @@
+---
+title: "R Notebook"
+output:
+  html_document:
+    df_print: paged
+---
+```{r "setup", include=FALSE}
+#Set the WD here
+knitr::opts_knit$set(root.dir = normalizePath('C:/Users/maxim/OneDrive - Montefiore Medicine/Shechter/Processed_Data/'))
+```
+
+```{r}
+##load libraries
+library(DEP)
+library(dplyr)
+library(tidyverse)
+library(rio)
+library(ggplot2)
+library(viridisLite)
+
+Peptide_longer <- readRDS("C:/Users/maxim/OneDrive - Montefiore Medicine/Shechter/Processed_Data/GluC_02/SDMA_tidy_TheoMW_03.RDS")
+#Peptide_longer[is.na(Peptide_longer)] <- 0
+Peptide_wider <- as.data.frame(Peptide_longer %>% select(-File.ID, -Replicate, -Inhibitor, -IP) %>%
+  pivot_wider(names_from = ID, values_from = Abundance))
+##build data
+#example <- UbiLength
+experimental_design <- read.csv('Trypsin/SDMA_Tryp_tidy_peptides_TheoMW_ExpDesign.csv', header =T)
+#Filter Stephanie's data to resemble MaxQuant
+data <- Peptide_wider
+# Are there any duplicated gene names?
+data$Gene.Symbol  %>% duplicated() %>% any()
+# Make a table of duplicated gene names
+data %>% group_by(Gene.Symbol) %>% summarize(frequency = n()) %>% 
+  arrange(desc(frequency)) %>% filter(frequency > 1)
+# Make unique names using the annotation in the "Gene.Symbol" column as primary names and the annotation in "Accession" as name for those that do not have an gene name.
+data_unique <- make_unique(data, "Gene.Symbol", "Accession", delim = ";")
+data_unique <- data_unique[!data_unique$Accession == '',]
+# Are there any duplicated names?
+data$name %>% duplicated() %>% any()
+# Generate a SummarizedExperiment object using an experimental design (LFQ=Abundance)
+data_se <- make_se(data_unique, grep("SDMA", colnames(data_unique)), experimental_design)
+# Generate a SummarizedExperiment object by parsing condition information from the column names
+#data_se_parsed <- make_se_parse(data_unique, LFQ_columns)
+```
+
+```{r}
+# Less stringent filtering:
+# Filter for proteins that are identified in 2 out of 3 replicates of at least one condition#data_filt <- filter_missval(data_se, thr = 1)
+# Filter for proteins that are identified in all replicates of at least one condition
+data_filt <- filter_missval(data_se, thr = 0)
+# Plot a barplot of the number of identified proteins per samples
+plot_numbers(data_filt)
+# Plot a barplot of the protein identification overlap between samples
+plot_coverage(data_filt)
+# Plot a barplot of the protein identification overlap between samples
+plot_frequency(data_filt)
+```
+
+```{r}
+# Normalize the data
+data_norm <- normalize_vsn(data_filt)
+# Visualize normalization by boxplots for all samples before and after normalization
+plot_normalization(data_filt, data_norm)
+```
+
+
+
+```{r}
+# Plot a heatmap of proteins with missing values
+plot_missval(data_filt)
+# Plot intensity distributions and cumulative fraction of proteins with and without missing values
+plot_detect(data_filt)
+# All possible imputation methods are printed in an error, if an invalid function name is given.
+#impute(data_norm, fun = "")
+
+# Extract protein names with missing values 
+# in all replicates of at least one condition
+proteins_MNAR <- get_df_long(data_norm) %>%
+  group_by(name, condition) %>%
+  summarize(NAs = all(is.na(intensity))) %>% 
+  filter(NAs) %>% 
+  pull(name) %>% 
+  unique()
+
+# Get a logical vector
+MNAR <- names(data_norm) %in% proteins_MNAR
+
+# Perform a mixed imputation
+mixed_imputation <- impute(
+  data_norm, 
+  fun = "mixed",
+  randna = !MNAR, # we have to define MAR which is the opposite of MNAR
+  mar = "knn", # imputation function for MAR
+  mnar = "min") # imputation function for MNAR
+
+data_imp <- mixed_imputation
+
+plot_imputation(data_norm, data_imp)
+
+#plot_imputation(data_norm, data_imp, sample_specific_imputation, mixed_imputation)
+```
+
+```{r}
+# Differential enrichment analysis  based on linear models and empherical Bayes statistics
+# Test every sample versus control
+#data_diff <- test_diff(data_imp, type = "control", control = "Control_SDMA")
+
+# Test all possible comparisons of samples
+#data_diff <- test_diff(data_imp, type = "all")
+# Test manually defined comparisons
+data_diff <- test_diff(data_imp, type = "manual", 
+                              test = c("GSK591_SDMA_vs_DMSO_SDMA", 'MS023_SDMA_vs_DMSO_SDMA', 'MS023_SDMA_vs_GSK591_SDMA'))
+
+# Denote significant proteins based on user defined cutoffs
+dep <- add_rejections(data_diff, alpha = 0.1, lfc = log2(0))
+
+# Plot the first and second principal components
+plot_pca(dep, x = 1, y = 2, n = 100, point_size = 4)
+
+# Plot the Pearson correlation matrix
+plot_cor(dep, significant = TRUE, lower = 0, upper = 1, pal = "Reds")
+
+# Plot a heatmap of all significant proteins with the data centered per protein
+plot_heatmap(dep, type = "centered", kmeans = TRUE, 
+             k = 2, col_limit = 4, show_row_names = FALSE,
+             indicate = c("condition", "replicate"))
+
+```
+
+```{r}
+# Plot a volcano plot for the contrast "Ubi6 vs Ctrl""
+plot_volcano(dep, contrast = "GSK591_SDMA_vs_DMSO_SDMA", label_size = 2, add_names = TRUE)
+plot_volcano(dep, contrast = "MS023_SDMA_vs_DMSO_SDMA", label_size = 2, add_names = TRUE)
+plot_volcano(dep, contrast = "MS023_SDMA_vs_GSK591_SDMA", label_size = 2, add_names = TRUE)
+# Plot a barplot for USP15 and IKBKG
+#plot_single(dep, proteins = c("ALYREF."))
+#plot_single(dep, proteins = c("CHTOP.47"))
+#plot_single(dep, proteins = c("CHTOP.59"))
+
+# Plot a barplot for the protein CHTOP with the data centered
+#plot_single(dep, proteins = "CHTOP", type = "centered")
+
+# Plot a frequency plot of significant proteins for the different conditions
+plot_cond(dep)
+```
+
+```{r}
+# Generate a results table
+data_results <- get_results(dep)
+
+# Number of significant proteins
+data_results %>% filter(significant) %>% nrow()
+
+# Generate a wide data.frame
+df_wide <- get_df_wide(dep)
+# Generate a long data.frame
+df_long <- get_df_long(dep)
+
+#write.csv(df_wide, 'GluC_SDMA_Peptide.csv')
+
+#plot pvals
+hist(data_results$GSK591_SDMA_vs_DMSO_SDMA_p.val)
+hist(data_results$MS023_SDMA_vs_DMSO_SDMA_p.val)
+hist(data_results$MS023_SDMA_vs_GSK591_SDMA_p.val)
+hist(data_results$GSK591_SDMA_vs_DMSO_SDMA_p.adj)
+hist(data_results$MS023_SDMA_vs_DMSO_SDMA_p.adj)
+hist(data_results$MS023_SDMA_vs_GSK591_SDMA_p.adj)
+
+
+```

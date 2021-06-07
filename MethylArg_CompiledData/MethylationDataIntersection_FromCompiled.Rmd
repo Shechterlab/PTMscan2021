@@ -1,0 +1,85 @@
+---
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r "setup", include=FALSE}
+knitr::opts_chunk$set(fig.width=42, fig.height=20) 
+knitr::opts_knit$set(root.dir = normalizePath('C:/Users/maxim/OneDrive - Montefiore Medicine/Shechter/Methylation_site_dataset/'))
+library(tidyverse)
+library(RColorBrewer)
+library(biomaRt)
+library(ComplexHeatmap)
+library(readr)
+```
+
+```{r,warning = FALSE}
+PSP <- as.data.frame(readxl::read_xlsx("C:/Users/maxim/OneDrive - Montefiore Medicine/Shechter/Methylation_site_dataset/Compiled_Methylarginine_data_v5.xlsx"))
+
+PSP$value <- paste(PSP$Accession, PSP$`Position In Protein`, sep ='_')
+
+Lim <- PSP[grep('Lim et al.', PSP$Reference),]
+Maron <- PSP[grep('This study.', PSP$Reference),]
+Hornbeck <- PSP[grep('Hornbeck et al.', PSP$Reference),]
+Li <- PSP[grep('Li et al.', PSP$Reference),]
+Musiani <- PSP[grep('Musiani et al.', PSP$Reference),]
+Larsen <- PSP[grep('Larsen et al.', PSP$Reference),]
+Guo <- PSP[grep('Guo et al.', PSP$Reference),]
+Fong <- PSP[grep('Fong et al.', PSP$Reference),]
+Wei <- PSP[grep('Wei et al.', PSP$Reference),]
+Fedoriw <- PSP[grep('Fedoriw et al.', PSP$Reference),]
+```
+
+
+
+
+```{r}
+methylarg <- list(Hornbeck = Hornbeck$value, Fedoriw = Fedoriw$value, Fong = Fong$value, Guo = Guo$value, Larsen = Larsen$value , Li = Li$value, Lim = Lim$value, Musiani = Musiani$value, Wei = Wei$value, Maron = Maron$value)
+#methylarg <- list(Fong = Fong$methylr, Larsen = Larsen$methylr, Li = Li$methylr, Lim = Lim$methylr, Musiani = Musiani$methylr, Wei = Wei$methylr, Maron = Maron$methylr)
+#methylarg <- list(Fong = Fong$methylr, Guo = Guo$methylr, Larsen = Larsen$methylr, Li = Li$methylr, Lim = Lim$methylr, Musiani = Musiani$methylr, Maron = Maron$methylr)
+
+methylarg <- lapply(methylarg, function(x) {x <- x[!duplicated(x)];x})
+methylarg <- lapply(methylarg, function(x) {x <- x[!is.na(x)];x})
+
+data <- list_to_matrix(methylarg)
+data.m <- make_comb_mat(data)
+
+UpSet(data.m)
+#UpSet(t(data.m))
+data.m
+test <- as.data.frame(data)
+for (i in 1:nrow(test)){
+  if (test[i,10] > sum(test[i,1:9])) {
+    test[i,11] <- 'TRUE'}
+  else {
+    test[i,11] <- 'FALSE'
+  }
+}
+```
+
+
+```{r}
+methylarg <- list(Hornbeck = Hornbeck$Accession, Fedoriw = Fedoriw$Accession, Fong = Fong$Accession, Guo = Guo$Accession, Larsen = Larsen$Accession , Li = Li$Accession, Lim = Lim$Accession, Musiani = Musiani$Accession, Wei = Wei$Accession, Maron = Maron$Accession)
+#methylarg <- list(Fong = Fong$methylr, Larsen = Larsen$methylr, Li = Li$methylr, Lim = Lim$methylr, Musiani = Musiani$methylr, Wei = Wei$methylr, Maron = Maron$methylr)
+#methylarg <- list(Fong = Fong$methylr, Guo = Guo$methylr, Larsen = Larsen$methylr, Li = Li$methylr, Lim = Lim$methylr, Musiani = Musiani$methylr, Maron = Maron$methylr)
+
+methylarg <- lapply(methylarg, function(x) {x <- x[!duplicated(x)];x})
+methylarg <- lapply(methylarg, function(x) {x <- x[!is.na(x)];x})
+
+data <- list_to_matrix(methylarg)
+data.m <- make_comb_mat(data)
+
+UpSet(data.m)
+#UpSet(t(data.m))
+data.m
+test <- as.data.frame(data)
+for (i in 1:nrow(test)){
+  if (test[i,10] > sum(test[i,1:9])) {
+    test[i,11] <- 'TRUE'}
+  else {
+    test[i,11] <- 'FALSE'
+  }
+}
+
+```

@@ -1,0 +1,138 @@
+---
+title: "R Notebook"
+output:
+  pdf_document: default
+  html_notebook: default
+---
+
+```{r "setup", include=FALSE}
+knitr::opts_knit$set(root.dir = normalizePath('C:/Users/maxim/OneDrive - Montefiore Medicine/Shechter/Processed_Data/'))
+library(tidyverse)
+library(VennDiagram)
+library(RColorBrewer)
+
+```
+
+```{r}
+GluC <- read.csv("C:/Users/maxim/OneDrive - Montefiore Medicine/Shechter/DEP/Notebooks/GluC/Input/Input_Peptide_Tidy_DEP_Gluc_SumPeptides_WideFormat.csv")
+GluC$data <- 'GluC'
+GluC_GSK591 <- GluC[GluC$GSK591_input_vs_DMSO_input_p.val < 0.05,]
+GluC_MS023 <- GluC[GluC$MS023_input_vs_DMSO_input_p.val < 0.05,]
+
+
+Trypsin <-  read.csv("C:/Users/maxim/OneDrive - Montefiore Medicine/Shechter/DEP/Notebooks/Trypsin/SumPeptide/Input_Peptide_Tidy_DEP_Trypsin_SumPeptides_WideFormat.csv")
+Trypsin$data <- 'Trypsin'
+Trypsin_GSK591 <- Trypsin[Trypsin$GSK591_input_vs_DMSO_input_p.val < 0.05,]
+Trypsin_MS023 <- Trypsin[Trypsin$MS023_input_vs_DMSO_input_p.val < 0.05,]
+
+Proteome_GSK591 <- rbind(GluC_GSK591[c(2,12)], Trypsin_GSK591[c(2,12)])
+
+Proteome_MS023 <- rbind(GluC_MS023[c(2,12)], Trypsin_MS023[c(2,12)])
+```
+
+```{r}
+
+MMA_trypsin <- read.csv("C:/Users/maxim/OneDrive - Montefiore Medicine/Shechter/Processed_Data/MMA_Trypsin_Peptide.csv")
+MMA_trypsin$data <- 'Trypsin'
+ADMA_trypsin <- read.csv("C:/Users/maxim/OneDrive - Montefiore Medicine/Shechter/Processed_Data/ADMA_Trypsin_Peptide.csv")
+ADMA_trypsin$data <- 'Trypsin'
+SDMA_trypsin <- read.csv("C:/Users/maxim/OneDrive - Montefiore Medicine/Shechter/Processed_Data/SDMA_Trypsin_Peptide.csv")
+SDMA_trypsin$data <- 'Trypsin'
+
+MMA_gluc <- read.csv("C:/Users/maxim/OneDrive - Montefiore Medicine/Shechter/Processed_Data/GluC_MMA_Peptide.csv")
+MMA_gluc$data <- 'GluC'
+ADMA_gluc <- read.csv("C:/Users/maxim/OneDrive - Montefiore Medicine/Shechter/Processed_Data/GluC_ADMA_Peptide.csv")
+ADMA_gluc$data <- 'GluC'
+SDMA_gluc <- read.csv("C:/Users/maxim/OneDrive - Montefiore Medicine/Shechter/Processed_Data/GluC_SDMA_Peptide.csv")
+SDMA_gluc$data <- 'GluC'
+
+df_MMA <- rbind(MMA_trypsin, MMA_gluc)
+df_MMA <- df_MMA[grep('R', df_MMA$Modifications),]
+df_ADMA <- rbind(ADMA_trypsin, ADMA_gluc)
+df_ADMA <- df_ADMA[grep('R', df_ADMA$Modifications),]
+df_SDMA <- rbind(SDMA_trypsin, SDMA_gluc)
+df_SDMA <- df_SDMA[grep('R', df_SDMA$Modifications),]
+
+
+df_MMA_GSK591 <- df_MMA[df_MMA$GSK591_MMA_vs_DMSO_MMA_p.val < 0.05,]
+
+df_ADMA_GSK591 <- df_ADMA[df_ADMA$GSK591_ADMA_vs_DMSO_ADMA_p.val < 0.05,]
+
+df_SDMA_GSK591 <- df_SDMA[df_SDMA$GSK591_SDMA_vs_DMSO_SDMA_p.val < 0.05,]
+
+IP_GSK591 <- rbind(df_MMA_GSK591[c(2,12)], df_ADMA_GSK591[c(2,12)], df_SDMA_GSK591[c(2,12)])
+
+df_MMA_MS023 <- df_MMA[df_MMA$MS023_MMA_vs_DMSO_MMA_p.val < 0.05,]
+
+df_ADMA_MS023 <- df_ADMA[df_ADMA$MS023_ADMA_vs_DMSO_ADMA_p.val < 0.05,]
+
+df_SDMA_MS023 <- df_SDMA[df_SDMA$MS023_SDMA_vs_DMSO_SDMA_p.val < 0.05,]
+
+IP_MS023 <- rbind(df_MMA_MS023[c(2,12)], df_ADMA_MS023[c(2,12)], df_SDMA_MS023[c(2,12)])
+
+```
+
+
+```{r}
+GSK591 <- list(df_MMA_GSK591 = df_MMA_GSK591, df_ADMA_GSK591 = df_ADMA_GSK591, df_SDMA_GSK591= df_SDMA_GSK591, Proteome_GSK591= Proteome_GSK591)
+
+GSK591 <- lapply(GSK591, function(x) {x <- x[!duplicated(x$Accession),];x})
+
+plt <- venn.diagram(x = list(GSK591[[1]]$Accession, GSK591[[2]]$Accession, GSK591[[3]]$Accession, GSK591[[4]]$Accession), category.names = c("MMA" , "ADMA", 'SDMA', 'Input'), filename = NULL, fill = c('#bababa','#bababa','#bababa','#bababa'), euler.d=T, scaled=T, output = F)
+##ggsave(plt, file= paste('InputChromatin_GSK_vs_DMSO_PTMscan', 'pdf' ,sep="."), device ='pdf', width = 15, height = 15, dpi = 300)
+
+overlap <- calculate.overlap(x = list(GSK591[[1]]$Accession, GSK591[[2]]$Accession, GSK591[[3]]$Accession, GSK591[[4]]$Accession))
+
+##write.csv(overlap$a3, 'InputChromatin_GSK_vs_DMSO_PTMscan_common.csv')
+
+plot(grid::grid.draw(plt), x= 1, y= 1)
+
+```
+```{r}
+MS023 <- list(df_MMA_MS023 = df_MMA_MS023, df_ADMA_MS023 = df_ADMA_MS023, df_SDMA_MS023= df_SDMA_MS023, Proteome_MS023= Proteome_MS023)
+
+MS023 <- lapply(MS023, function(x) {x <- x[!duplicated(x$Accession),];x})
+
+plt <- venn.diagram(x = list(MS023[[1]]$Accession, MS023[[2]]$Accession, MS023[[3]]$Accession, MS023[[4]]$Accession), category.names = c("MMA" , "ADMA", 'SDMA', 'Input'), filename = NULL, fill = c('#bababa','#bababa','#bababa','#bababa'), euler.d=T, scaled=T, output = F)
+##ggsave(plt, file= paste('InputChromatin_GSK_vs_DMSO_PTMscan', 'pdf' ,sep="."), device ='pdf', width = 15, height = 15, dpi = 300)
+
+overlap <- calculate.overlap(x = list(MS023[[1]]$Accession, MS023[[2]]$Accession, MS023[[3]]$Accession, MS023[[4]]$Accession))
+
+##write.csv(overlap$a3, 'InputChromatin_GSK_vs_DMSO_PTMscan_common.csv')
+
+plot(grid::grid.draw(plt), x= 1, y= 1)
+
+```
+
+```{r}
+GSK591 <- list(IP_GSK591 = IP_GSK591, Proteome_GSK591= Proteome_GSK591)
+
+GSK591 <- lapply(GSK591, function(x) {x <- x[!duplicated(x$Accession),];x})
+
+plt <- venn.diagram(x = list(GSK591[[1]]$Accession, GSK591[[2]]$Accession), category.names = c("Rme" , 'Input'), filename = NULL, fill = c('#bababa','#bababa'), euler.d=T, scaled=T, output = F)
+##ggsave(plt, file= paste('InputChromatin_GSK_vs_DMSO_PTMscan', 'pdf' ,sep="."), device ='pdf', width = 15, height = 15, dpi = 300)
+
+overlap <- calculate.overlap(x = list(GSK591[[1]]$Accession, GSK591[[2]]$Accession))
+
+##write.csv(overlap$a3, 'InputChromatin_GSK_vs_DMSO_PTMscan_common.csv')
+
+plot(grid::grid.draw(plt), x= 1, y= 1)
+
+```
+
+
+```{r}
+MS023 <- list(IP_MS023 = IP_MS023, Proteome_MS023= Proteome_MS023)
+
+MS023 <- lapply(MS023, function(x) {x <- x[!duplicated(x$Accession),];x})
+
+plt <- venn.diagram(x = list(MS023[[1]]$Accession, MS023[[2]]$Accession), category.names = c("Rme" , 'Input'), filename = NULL, fill = c('#bababa','#bababa'), euler.d=T, scaled=T, output = F)
+##ggsave(plt, file= paste('InputChromatin_GSK_vs_DMSO_PTMscan', 'pdf' ,sep="."), device ='pdf', width = 15, height = 15, dpi = 300)
+
+overlap <- calculate.overlap(x = list(MS023[[1]]$Accession, MS023[[2]]$Accession))
+
+##write.csv(overlap$a3, 'InputChromatin_GSK_vs_DMSO_PTMscan_common.csv')
+
+plot(grid::grid.draw(plt), x= 1, y= 1)
+
+```
