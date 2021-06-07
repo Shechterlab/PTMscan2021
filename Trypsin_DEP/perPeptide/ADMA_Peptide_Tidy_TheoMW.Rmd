@@ -6,7 +6,7 @@ output:
 ---
 ```{r "setup", include=FALSE}
 #Set the WD here
-knitr::opts_knit$set(root.dir = normalizePath('C:/Users/maxim/OneDrive/Shechter/Processed_Data/'))
+knitr::opts_knit$set(root.dir = normalizePath('C:/Users/maxim/OneDrive - Montefiore Medicine/Shechter/Processed_Data/'))
 ```
 
 ```{r}
@@ -18,7 +18,7 @@ library(rio)
 library(ggplot2)
 library(viridisLite)
 
-Peptide_longer <- readRDS("C:/Users/maxim/OneDrive/Shechter/Processed_Data/Tryp_02/ADMA_tidy_TheoMW_03.RDS")
+Peptide_longer <- readRDS("C:/Users/maxim/OneDrive - Montefiore Medicine/Shechter/Processed_Data/Tryp_02/ADMA_tidy_TheoMW_03.RDS")
 Peptide_longer <- Peptide_longer[!duplicated(Peptide_longer[c(grep('Sequence', colnames(Peptide_longer)), grep('Theo.MHplus.in.Da', colnames(Peptide_longer)), grep('ID', colnames(Peptide_longer)))]),]
 #Peptide_longer[is.na(Peptide_longer)] <- 0
 Peptide_wider <- as.data.frame(Peptide_longer %>% select(-File.ID, -Replicate, -Inhibitor, -IP) %>%
@@ -27,7 +27,7 @@ Peptide_wider <- as.data.frame(Peptide_longer %>% select(-File.ID, -Replicate, -
 #example <- UbiLength
 experimental_design <- read.csv('Trypsin/ADMA_Tryp_tidy_peptides_TheoMW_ExpDesign.csv', header =T)
 #Filter Stephanie's data to resemble MaxQuant
-data <- Peptide_wider[c(grep('Accession', colnames(Peptide_wider)),grep('Accession', colnames(Peptide_wider)),grep('Description', colnames(Peptide_wider)),grep('Gene.Symbol', colnames(Peptide_wider)),grep('Sequence', colnames(Peptide_wider)),grep('Begin.Pos', colnames(Peptide_wider)),grep('End.Pos', colnames(Peptide_wider)),grep('Modifications', colnames(Peptide_wider)), grep('MS023_ADMA_3', colnames(Peptide_wider)):grep('MS023_ADMA_1', colnames(Peptide_wider)))]
+data <- Peptide_wider
 # Are there any duplicated gene names?
 data$Gene.Symbol  %>% duplicated() %>% any()
 # Make a table of duplicated gene names
@@ -45,8 +45,7 @@ data_se <- make_se(data_unique, grep("ADMA", colnames(data_unique)), experimenta
 ```
 
 ```{r}
-# Plot a barplot of the protein identification overlap between samples
-plot_frequency(data_se)
+
 # Less stringent filtering:
 # Filter for proteins that are identified in 2 out of 3 replicates of at least one condition#data_filt <- filter_missval(data_se, thr = 1)
 # Filter for proteins that are identified in all replicates of at least one condition
@@ -55,6 +54,8 @@ data_filt <- filter_missval(data_se, thr = 0)
 plot_numbers(data_filt)
 # Plot a barplot of the protein identification overlap between samples
 plot_coverage(data_filt)
+# Plot a barplot of the protein identification overlap between samples
+plot_frequency(data_filt)
 ```
 
 ```{r}
@@ -76,33 +77,6 @@ plot_missval(data_filt)
 plot_detect(data_filt)
 # All possible imputation methods are printed in an error, if an invalid function name is given.
 #impute(data_norm, fun = "")
-# Impute missing data using random draws from a Gaussian distribution centered around a minimal value (for MNAR)
-#data_imp <- impute(data_norm, fun = "MinProb", q = 0.01)
-# Impute missing data using Bayesian PCA
-#data_imp <- impute(data_norm, fun = "bpca")
-#data_imp_bcpa <- data_imp
-# Impute missing data using Maximum likelihood based imputation
-#data_imp <- impute(data_norm, fun = "MLE") #MLE gives similar results to BPCA
-
-#data_imp <- impute(data_norm, fun = "MinDet") #MLE gives similar results to BPCA
-
-#data_imp <- impute(data_norm, fun = "zero") #MLE gives similar results to BPCA
-#data_imp <- impute(data_norm, fun = "min") #MLE gives similar results to BPCA
-#data_imp <- data_norm
-# Impute missing data using random draws from a manually defined left-shifted Gaussian distribution (for MNAR)
-#+data_imp <- impute(data_norm, fun = "man", shift = 4, scale = 0.3)
-# Impute missing data using the k-nearest neighbour approach (for MAR)
-#-data_imp <- impute(data_norm, fun = "knn", rowmax = 0.9)
-# Plot intensity distributions before and after imputation
-# SummarizedExperiment to MSnSet object conversion
-#sample_specific_imputation <- data_norm
-#MSnSet <- as(sample_specific_imputation, "MSnSet")
-#MSnSet_imputed1 <- MSnbase::impute(MSnSet[,1:6], method = "knn")
-#MSnSet_imputed2 <- MSnbase::impute(MSnSet[,7:9], method = "MinProb")
-#assay(sample_specific_imputation) <- cbind(
-#  MSnbase::exprs(MSnSet_imputed1), 
-#  MSnbase::exprs(MSnSet_imputed2))
-
 # Extract protein names with missing values 
 # in all replicates of at least one condition
 proteins_MNAR <- get_df_long(data_norm) %>%
@@ -162,17 +136,6 @@ plot_heatmap(dep, type = "centered", kmeans = TRUE,
 plot_volcano(dep, contrast = "GSK591_ADMA_vs_DMSO_ADMA", label_size = 2, add_names = TRUE)
 plot_volcano(dep, contrast = "MS023_ADMA_vs_DMSO_ADMA", label_size = 2, add_names = TRUE)
 plot_volcano(dep, contrast = "MS023_ADMA_vs_GSK591_ADMA", label_size = 2, add_names = TRUE)
-# Plot a barplot for USP15 and IKBKG
-plot_single(dep, proteins = c("CHTOP.20"), type ='centered')
-plot_single(dep, proteins = c("CHTOP.24"), type ='centered')
-plot_single(dep, proteins = c("CHTOP.47"), type ='centered')
-plot_single(dep, proteins = c("CHTOP.59"), type ='centered')
-plot_single(dep, proteins = c("CHTOP.66"), type ='centered')
-plot_single(dep, proteins = c("ALYREF.28"), type ='centered')
-plot_single(dep, proteins = c("ALYREF.38"), type ='centered')
-plot_single(dep, proteins = c("ALYREF.42"), type ='centered')
-plot_single(dep, proteins = c("ALYREF.56"), type ='centered')
-plot_single(dep, proteins = c("ALYREF.62"), type ='centered')
 
 # Plot a barplot for the protein CHTOP with the data centered
 #plot_single(dep, proteins = "CHTOP", type = "centered")
@@ -194,6 +157,9 @@ df_wide <- get_df_wide(dep)
 df_long <- get_df_long(dep)
 
 
+#write.csv(df_wide, 'ADMA_Trypsin_Peptide.csv')
+
+
 #plot pvals
 hist(data_results$GSK591_ADMA_vs_DMSO_ADMA_p.val)
 hist(data_results$MS023_ADMA_vs_DMSO_ADMA_p.val)
@@ -203,159 +169,4 @@ hist(data_results$MS023_ADMA_vs_DMSO_ADMA_p.adj)
 hist(data_results$MS023_ADMA_vs_GSK591_ADMA_p.adj)
 
 
-```
-
-
-```{r}
-
-#get max number of modifications to know how many columns you need
-max(str_count(df_wide$Modifications, "_"))
-
-#create empty columns to store modifications
-Peptide_Modifications <- as.data.frame(df_wide %>% separate(Modifications, c('Modification.Position.1','Modification.Position.2', 'Modification.Position.3', 'Modification.Position.4', 'Modification.Position.5', 'Modification.Position.6', 'Modification.Position.7', 'Modification.Position.8', 'Modification.Position.9', 'Modification.Position.10'), sep = '_', extra = 'merge', fill = 'right'))
-
-#isolate new modification columns into separate dataframe 
-Modification.a <- Peptide_Modifications[grep("^Modification",colnames(Peptide_Modifications))]
-
-#extract integer from string
-Modification.b <- sapply(Modification.a[1:9], function(x) str_extract(x,"[[:digit:]]+"))
-
-#if no modification present then set as 0
-Modification.b[is.na(Modification.b)] <- 0
-
-#convert to dataframe
-Modification.b <- as.data.frame(Modification.b)
-
-#use sapply to ensure values are integers
-Modification.b <- sapply(Modification.b[1:9], as.integer)
-
-# Rename the Integer Columns
-colnames(Modification.b) <- paste("Integer.", 1:9, sep="")
-
-#get the last location of the modification
-max <- as.data.frame(apply(Modification.b, 1, function(x) max(x, na.rm = TRUE)))
-colnames(max) <- 'max'
-
-#concatenate the last modification position with df_wide
-df_wide <- cbind(df_wide, max)
-
-#if the last modificaiton is at the position of the last amino aid then annotate it as TRUE
-df_wide[df_wide$max == df_wide$End.Pos, 'group'] <- 'yes'
-df_wide[df_wide$max != df_wide$End.Pos, 'group'] <- 'no'
-df_wide <- df_wide[df_wide$group != 'yes',]
-```
-
-```{r}
-library(tidyverse)
-library(ggrepel)
-DMSO_color <- '#d4d4d4'
-GSK591_color <- '#008837'
-MS023_color <- '#7b3294'
-
-data <- df_wide
-
-data[data$GSK591_ADMA_vs_DMSO_ADMA_p.val != 0, "group"] <- 'not_significant' 
-data[data$GSK591_ADMA_vs_DMSO_ADMA_p.val < 0.05, "group"] <- 'significant' 
-
-data <- data[order(data$GSK591_ADMA_vs_DMSO_ADMA_p.val),]
-
-#pdf('GSK591dex_vs_DMSOdex_GR_ChIP_deseq2_pval.pdf', height = 8, width =8)
-ggplot(data, aes(x=GSK591_ADMA_vs_DMSO_ADMA_diff, y=-log2(GSK591_ADMA_vs_DMSO_ADMA_p.val), color = group, label = name)) +
-  geom_point(aes(size=-log2(GSK591_ADMA_vs_DMSO_ADMA_p.val), alpha = group, colour = group), shape = 20, alpha = 0.5) +
-  scale_color_manual(values= c(DMSO_color,GSK591_color)) +
-  geom_text_repel(data = subset(data, group == 'significant')[1:20,], aes(label=gsub("\\..*","",name)), size=2, colour = "black")+
-  theme(legend.position = "none",
-        axis.text.y   = element_text(size=8, colour = "black"),
-        axis.text.x   = element_text(size=8, colour = "black"),
-        axis.title.y  = element_text(size=8, colour = "black"),
-        axis.title.x  = element_text(size=8, colour = "black"),
-        panel.background = element_blank(),
-        panel.grid.major = element_blank(), 
-        panel.grid.minor = element_blank(),
-        axis.line = element_line(colour = "black"),
-        panel.border = element_rect(colour = "black", fill=NA, size=1))+
-  geom_vline(xintercept=c(0), linetype="solid")+
-  geom_hline(yintercept=c(0), linetype="solid")+
-  geom_hline(yintercept=c(4.4), linetype="dotted")+
-  #xlim(-10,10)+
-  #scale_y_continuous(limits = c(0,20), expand = c(0, 0)) +
-  labs(title="",x="log2FC", y = "-log2(p.value)")
-#dev.off()
-```
-
-```{r}
-library(tidyverse)
-library(ggrepel)
-DMSO_color <- '#d4d4d4'
-GSK591_color <- '#008837'
-MS023_color <- '#7b3294'
-
-data <- df_wide
-
-data[data$MS023_ADMA_vs_DMSO_ADMA_p.val != 0, "group"] <- 'not_significant' 
-data[data$MS023_ADMA_vs_DMSO_ADMA_p.val < 0.05, "group"] <- 'significant' 
-
-data <- data[order(data$MS023_ADMA_vs_DMSO_ADMA_p.val),]
-
-#pdf('MS023dex_vs_DMSOdex_GR_ChIP_deseq2_pval.pdf', height = 8, width =8)
-ggplot(data, aes(x=MS023_ADMA_vs_DMSO_ADMA_diff, y=-log2(MS023_ADMA_vs_DMSO_ADMA_p.val), color = group, label = name)) +
-  geom_point(aes(size=-log2(MS023_ADMA_vs_DMSO_ADMA_p.val), alpha = group, colour = group), shape = 20, alpha = 0.5) +
-  scale_color_manual(values= c(DMSO_color,MS023_color)) +
-  geom_text_repel(data = subset(data, group == 'significant')[1:20,], aes(label=gsub("\\..*","",name)), size=2, colour = "black")+
-  theme(legend.position = "none",
-        axis.text.y   = element_text(size=8, colour = "black"),
-        axis.text.x   = element_text(size=8, colour = "black"),
-        axis.title.y  = element_text(size=8, colour = "black"),
-        axis.title.x  = element_text(size=8, colour = "black"),
-        panel.background = element_blank(),
-        panel.grid.major = element_blank(), 
-        panel.grid.minor = element_blank(),
-        axis.line = element_line(colour = "black"),
-        panel.border = element_rect(colour = "black", fill=NA, size=1))+
-  geom_vline(xintercept=c(0), linetype="solid")+
-  geom_hline(yintercept=c(0), linetype="solid")+
-  geom_hline(yintercept=c(4.4), linetype="dotted")+
-  #xlim(-10,10)+
-  #scale_y_continuous(limits = c(0,20), expand = c(0, 0)) +
-  labs(title="",x="log2FC", y = "-log2(p.value)")
-#dev.off()
-```
-
-```{r}
-library(tidyverse)
-library(ggrepel)
-DMSO_color <- '#d4d4d4'
-GSK591_color <- '#008837'
-MS023_color <- '#7b3294'
-GSK591_MS023_color <- '#8c510a'
-
-data <- df_wide
-
-data[data$MS023_ADMA_vs_GSK591_ADMA_p.val != 0, "group"] <- 'not_significant' 
-data[data$MS023_ADMA_vs_GSK591_ADMA_p.val < 0.05, "group"] <- 'significant' 
-
-data <- data[order(data$MS023_ADMA_vs_GSK591_ADMA_p.val),]
-
-#pdf('MS023dex_vs_DMSOdex_GR_ChIP_deseq2_pval.pdf', height = 8, width =8)
-ggplot(data, aes(x=MS023_ADMA_vs_GSK591_ADMA_diff, y=-log2(MS023_ADMA_vs_GSK591_ADMA_p.val), color = group, label = name)) +
-  geom_point(aes(size=-log2(MS023_ADMA_vs_GSK591_ADMA_p.val), alpha = group, colour = group), shape = 20, alpha = 0.5) +
-  scale_color_manual(values= c(DMSO_color,GSK591_MS023_color)) +
-  geom_text_repel(data = subset(data, group == 'significant')[1:20,], aes(label=gsub("\\..*","",name)), size=2, colour = "black")+
-  theme(legend.position = "none",
-        axis.text.y   = element_text(size=8, colour = "black"),
-        axis.text.x   = element_text(size=8, colour = "black"),
-        axis.title.y  = element_text(size=8, colour = "black"),
-        axis.title.x  = element_text(size=8, colour = "black"),
-        panel.background = element_blank(),
-        panel.grid.major = element_blank(), 
-        panel.grid.minor = element_blank(),
-        axis.line = element_line(colour = "black"),
-        panel.border = element_rect(colour = "black", fill=NA, size=1))+
-  geom_vline(xintercept=c(0), linetype="solid")+
-  geom_hline(yintercept=c(0), linetype="solid")+
-  geom_hline(yintercept=c(4.4), linetype="dotted")+
-  #xlim(-10,10)+
-  #scale_y_continuous(limits = c(0,20), expand = c(0, 0)) +
-  labs(title="",x="log2FC", y = "-log2(p.value)")
-#dev.off()
 ```
