@@ -1,0 +1,335 @@
+---
+title: "R Notebook"
+output:
+  html_document:
+    df_print: paged
+---
+```{r "setup", include=FALSE}
+#Set the WD here
+knitr::opts_knit$set(root.dir = normalizePath('C:/Users/maxim/OneDrive - Montefiore Medicine/Shechter/Processed_Data/'))
+```
+
+```{r}
+##load libraries
+library(DEP)
+library(dplyr)
+library(tidyverse)
+library(rio)
+library(ggplot2)
+library(viridisLite)
+
+Peptide_longer_SDMA <- readRDS("C:/Users/maxim/OneDrive - Montefiore Medicine/Shechter/Processed_Data/GluC_02/SDMA_tidy_TheoMW_03.RDS")
+Peptide_longer_SDMA$group <- 'SDMA'
+Peptide_longer_MMA <- readRDS("C:/Users/maxim/OneDrive - Montefiore Medicine/Shechter/Processed_Data/GluC_02/MMA_tidy_TheoMW_03.RDS")
+Peptide_longer_MMA$group <- 'MMA'
+Peptide_longer_ADMA <- readRDS("C:/Users/maxim/OneDrive - Montefiore Medicine/Shechter/Processed_Data/GluC_02/ADMA_tidy_TheoMW_03.RDS")
+Peptide_longer_ADMA$group <- 'ADMA'
+Peptide_longer <- rbind(Peptide_longer_MMA, Peptide_longer_ADMA, Peptide_longer_SDMA)
+
+Peptide_longer$ID <- gsub("_MMA", "", Peptide_longer$ID)
+Peptide_longer$ID <- gsub("_ADMA", "", Peptide_longer$ID)
+Peptide_longer$ID <- gsub("_SDMA", "", Peptide_longer$ID)
+
+
+Peptide_longer <- Peptide_longer[!Peptide_longer$Modifications == '',]
+Peptide_longer <- Peptide_longer[grep('R', Peptide_longer$Modifications),]
+
+Peptide_longer$Abundance[is.na(Peptide_longer$Abundance)] <- 0
+
+
+Peptide_longer_sum <- aggregate(list(Abundance = Peptide_longer$Abundance), by=list(ID = Peptide_longer$ID, Gene.Symbol = Peptide_longer$Gene.Symbol, Description = Peptide_longer$Description, Accession = Peptide_longer$Accession, Sequence = Peptide_longer$Sequence, Modifications = Peptide_longer$Modifications, Theo.MHplus.in.Da = Peptide_longer$Theo.MHplus.in.Da, Begin.Pos = Peptide_longer$Begin.Pos, End.Pos = Peptide_longer$End.Pos), FUN=sum)
+
+
+#Peptide_longer <- Peptide_longer[!duplicated(Peptide_longer[c(grep('Sequence', colnames(Peptide_longer)), grep('Theo.MHplus.in.Da', colnames(Peptide_longer)), grep('ID', colnames(Peptide_longer)))]),]
+#Peptide_longer[is.na(Peptide_longer)] <- 0
+Peptide_wider <- as.data.frame(Peptide_longer_sum %>%
+  pivot_wider(names_from = ID, values_from = Abundance))
+
+##build data
+#example <- UbiLength
+experimental_design <- read.csv('Trypsin/Concatenated_Tryp_tidy_peptides_TheoMW_ExpDesign.csv', header =T)
+#Filter Stephanie's data to resemble MaxQuant
+data <- Peptide_wider
+# Are there any duplicated gene names?
+data$Gene.Symbol  %>% duplicated() %>% any()
+# Make a table of duplicated gene names
+data %>% group_by(Gene.Symbol) %>% summarize(frequency = n()) %>% 
+  arrange(desc(frequency)) %>% filter(frequency > 1)
+# Make unique names using the annotation in the "Gene.Symbol" column as primary names and the annotation in "Accession" as name for those that do not have an gene name.
+data_unique <- make_unique(data, "Gene.Symbol", "Accession", delim = ";")
+data_unique <- data_unique[!data_unique$Accession == '',]
+# Are there any duplicated names?
+data$name %>% duplicated() %>% any()
+# Generate a SummarizedExperiment object using an experimental design (LFQ=Abundance)
+data_se <- make_se(data_unique, grep("_", colnames(data_unique)), experimental_design)
+# Generate a SummarizedExperiment object by parsing condition information from the column names
+#data_se_parsed <- make_se_parse(data_unique, LFQ_columns)
+```
+
+```{r}
+# Plot a barplot of the protein identification overlap between samples
+#plot_frequency(data_se)
+# Less stringent filtering:
+# Filter for proteins that are identified in 2 out of 3 replicates of at least one condition#data_filt <- filter_missval(data_se, thr = 1)
+# Filter for proteins that are identified in all replicates of at least one condition
+data_filt <- filter_missval(data_se, thr = 0)
+# Plot a barplot of the number of identified proteins per samples
+plot_numbers(data_filt)
+# Plot a barplot of the protein identification overlap between samples
+plot_coverage(data_filt)
+plot_frequency(data_filt)
+```
+
+```{r}
+# Normalize the data
+data_norm <- normalize_vsn(data_filt)
+# Visualize normalization by boxplots for all samples before and after normalization
+plot_normalization(data_filt, data_norm)
+```
+
+
+
+```{r}
+#I have tried various methods of imputation. Appears that a combo of MNAR and MAR rowise to compare proteins between conditions with an imputation of the minimum value for those that are missing makes the most sense.
+
+
+# Plot a heatmap of proteins with missing values
+plot_missval(data_filt)
+# Plot intensity distributions and cumulative fraction of proteins with and without missing values
+plot_detect(data_filt)
+# All possible imputation methods are printed in an error, if an invalid function name is given.
+#impute(data_norm, fun = "")
+# Extract protein names with missing values 
+# in all replicates of at least one condition
+proteins_MNAR <- get_df_long(data_norm) %>%
+  group_by(name, condition) %>%
+  summarize(NAs = all(is.na(intensity))) %>% 
+  filter(NAs) %>% 
+  pull(name) %>% 
+  unique()
+
+# Get a logical vector
+MNAR <- names(data_norm) %in% proteins_MNAR
+
+# Perform a mixed imputation
+mixed_imputation <- impute(
+  data_norm, 
+  fun = "mixed",
+  randna = !MNAR, # we have to define MAR which is the opposite of MNAR
+  mar = "knn", # imputation function for MAR
+  mnar = "min") # imputation function for MNAR
+
+data_imp <- mixed_imputation
+
+plot_imputation(data_norm, data_imp)
+
+#plot_imputation(data_norm, data_imp, sample_specific_imputation, mixed_imputation)
+```
+
+```{r}
+# Differential enrichment analysis  based on linear models and empherical Bayes statistics
+# Test every sample versus control
+#data_diff <- test_diff(data_imp, type = "control", control = "Control")
+
+# Test all possible comparisons of samples
+#data_diff <- test_diff(data_imp, type = "all")
+# Test manually defined comparisons
+data_diff <- test_diff(data_imp, type = "manual", 
+                              test = c("GSK591_vs_DMSO", 'MS023_vs_DMSO', 'MS023_vs_GSK591'))
+
+# Denote significant proteins based on user defined cutoffs
+dep <- add_rejections(data_diff, alpha = 0.1, lfc = log2(0))
+
+# Plot the first and second principal components
+plot_pca(dep, x = 1, y = 2, n = 100, point_size = 4)
+
+# Plot the Pearson correlation matrix
+plot_cor(dep, significant = TRUE, lower = 0, upper = 1, pal = "Reds")
+
+# Plot a heatmap of all significant proteins with the data centered per protein
+plot_heatmap(dep, type = "centered", kmeans = TRUE, 
+             k = 2, col_limit = 4, show_row_names = FALSE,
+             indicate = c("condition", "replicate"))
+
+```
+
+```{r}
+# Plot a volcano plot for the contrast "Ubi6 vs Ctrl""
+plot_volcano(dep, contrast = "GSK591_vs_DMSO", label_size = 2, add_names = TRUE)
+plot_volcano(dep, contrast = "MS023_vs_DMSO", label_size = 2, add_names = TRUE)
+plot_volcano(dep, contrast = "MS023_vs_GSK591", label_size = 2, add_names = TRUE)
+# Plot a barplot for USP15 and IKBKG
+plot_single(dep, proteins = c("TAF15.2"), type= "centered")
+
+
+# Plot a barplot for the protein CHTOP with the data centered
+#plot_single(dep, proteins = "CHTOP", type = "centered")
+
+# Plot a frequency plot of significant proteins for the different conditions
+plot_cond(dep)
+```
+
+```{r}
+# Generate a results table
+data_results <- get_results(dep)
+
+# Number of significant proteins
+data_results %>% filter(significant) %>% nrow()
+
+# Generate a wide data.frame
+df_wide <- get_df_wide(dep)
+# Generate a long data.frame
+df_long <- get_df_long(dep)
+
+#write.csv(df_wide, 'Gluc_MMA_ADMA_SDMA_PerPeptide.csv')
+
+#plot pvals
+hist(data_results$GSK591_vs_DMSO_p.val)
+hist(data_results$MS023_vs_DMSO_p.val)
+hist(data_results$MS023_vs_GSK591_p.val)
+hist(data_results$GSK591_vs_DMSO_p.adj)
+hist(data_results$MS023_vs_DMSO_p.adj)
+hist(data_results$MS023_vs_GSK591_p.adj)
+
+
+```
+
+```{r}
+
+#get max number of modifications to know how many columns you need
+max(str_count(df_wide$Modifications, "_"))
+
+#create empty columns to store modifications
+#Peptide_Modifications <- as.data.frame(df_wide %>% separate(Modifications, c('Modification.Position.1','Modification.Position.2', 'Modification.Position.3', 'Modification.Position.4', 'Modification.Position.5', 'Modification.Position.6', 'Modification.Position.7', 'Modification.Position.8', 'Modification.Position.9', 'Modification.Position.10'), sep = '_', extra = 'merge', fill = 'right'))
+
+#Peptide_Modifications <- Peptide_Modifications[grep('name',colnames(Peptide_Modifications)):grep('Modification.Position.10',colnames(Peptide_Modifications))]
+
+#isolate new modification columns into separate dataframe 
+#Modification.a <- Peptide_Modifications[grep("^Modification",colnames(Peptide_Modifications))]
+
+#extract integer from string
+#Modification.b <- sapply(Modification.a[1:9], function(x) str_extract(x,"[[:digit:]]+"))
+
+#if no modification present then set as 0
+#Modification.b[is.na(Modification.b)] <- 0
+
+#convert to dataframe
+#Modification.b <- as.data.frame(Modification.b)
+
+#use sapply to ensure values are integers
+#Modification.b <- sapply(Modification.b[1:9], as.integer)
+
+# Rename the Integer Columns
+#colnames(Modification.b) <- paste("Integer.", 1:9, sep="")
+
+#get the last location of the modification
+#max <- as.data.frame(apply(Modification.b, 1, function(x) max(x, na.rm = TRUE)))
+#colnames(max) <- 'max'
+
+#concatenate the last modification position with df_wide
+#df_wide <- cbind(df_wide, max)
+
+#if the last modificaiton is at the position of the last amino aid then annotate it as TRUE
+#df_wide[df_wide$max == df_wide$End.Pos, 'group'] <- 'yes'
+#df_wide[df_wide$max != df_wide$End.Pos, 'group'] <- 'no'
+#df_wide <- df_wide[df_wide$group != 'yes',]
+
+
+#if we running with above code uncomment below otherwise skip, create empty columns to store modifications
+#Peptide_Modifications <- as.data.frame(df_wide %>% select(-max, -group) %>% separate(Modifications, c('Modification.Position.1','Modification.Position.2', 'Modification.Position.3', 'Modification.Position.4', 'Modification.Position.5', 'Modification.Position.6', 'Modification.Position.7', 'Modification.Position.8', 'Modification.Position.9', 'Modification.Position.10'), sep = '_', extra = 'merge', fill = 'right'))
+
+#create empty columns to store modifications
+Peptide_Modifications <- as.data.frame(df_wide %>% separate(Modifications, c('Modification.Position.1','Modification.Position.2', 'Modification.Position.3', 'Modification.Position.4', 'Modification.Position.5', 'Modification.Position.6', 'Modification.Position.7', 'Modification.Position.8', 'Modification.Position.9', 'Modification.Position.10'), sep = '_', extra = 'merge', fill = 'right'))
+Peptide_Modifications <- Peptide_Modifications[grep('name',colnames(Peptide_Modifications)):grep('Modification.Position.10',colnames(Peptide_Modifications))]
+
+Peptide_Modifcations_longer <- as.data.frame(Peptide_Modifications %>% select(-name) %>%
+  pivot_longer(cols= DMSO_1:MS023_3, names_to = c('ID')))
+
+Peptide_Modifcations_longer <- as.data.frame(Peptide_Modifications %>%
+  pivot_longer(cols= Modification.Position.1:Modification.Position.10, names_to = c('Modification')))
+
+Peptide_Modifcations_longer_sum <- aggregate(Peptide_Modifcations_longer[grep('DMSO_1', colnames(Peptide_Modifcations_longer)):grep('MS023_3', colnames(Peptide_Modifcations_longer))], by=list(Gene.Symbol = Peptide_Modifcations_longer$Gene.Symbol, Description = Peptide_Modifcations_longer$Description, Accession = Peptide_Modifcations_longer$Accession, value = Peptide_Modifcations_longer$value), FUN=sum)
+
+Peptide_Modifcations_longer_sum <- Peptide_Modifcations_longer_sum[grep('R', Peptide_Modifcations_longer_sum$value),]
+```
+
+```{r}
+experimental_design$label <- gsub('Control', 'DMSO', experimental_design$label)
+
+data <- Peptide_Modifcations_longer_sum
+
+data$name <- paste(data$Gene.Symbol, data$value, sep='_')
+# Are there any duplicated gene names?
+data$name  %>% duplicated() %>% any()
+# Generate a SuSDMArizedExperiment object by parsing condition information from the column names
+data_unique <- make_unique(data, "name", "value", delim = ";")
+# Generate a SuSDMArizedExperiment object using an experimental design (LFQ=Abundance)
+data_se <- make_se(data_unique, grep("_", colnames(data_unique)), experimental_design)
+# Generate a SuSDMArizedExperiment object by parsing condition information from the column names
+#data_se_parsed <- make_se_parse(data_unique, LFQ_columns)
+```
+
+
+```{r}
+# Differential enrichment analysis  based on linear models and empherical Bayes statistics
+# Test every sample versus control
+#data_diff <- test_diff(data_imp, type = "control", control = "Control")
+
+# Test all possible comparisons of samples
+#data_diff <- test_diff(data_imp, type = "all")
+# Test manually defined comparisons
+data_diff <- test_diff(data_se, type = "manual", 
+                              test = c("GSK591_vs_DMSO", 'MS023_vs_DMSO', 'MS023_vs_GSK591'))
+
+# Denote significant proteins based on user defined cutoffs
+dep <- add_rejections(data_diff, alpha = 0.1, lfc = log2(0))
+
+# Plot the first and second principal components
+plot_pca(dep, x = 1, y = 2, n = 100, point_size = 4)
+
+# Plot the Pearson correlation matrix
+plot_cor(dep, significant = TRUE, lower = 0, upper = 1, pal = "Reds")
+
+# Plot a heatmap of all significant proteins with the data centered per protein
+plot_heatmap(dep, type = "centered", kmeans = TRUE, 
+             k = 2, col_limit = 4, show_row_names = FALSE,
+             indicate = c("condition", "replicate"))
+# Plot a volcano plot for the contrast "Ubi6 vs Ctrl""
+plot_volcano(dep, contrast = "GSK591_vs_DMSO", label_size = 2, add_names = TRUE)
+plot_volcano(dep, contrast = "MS023_vs_DMSO", label_size = 2, add_names = TRUE)
+plot_volcano(dep, contrast = "MS023_vs_GSK591", label_size = 2, add_names = TRUE)
+# Plot a barplot for USP15 and IKBKG
+#plot_single(dep, proteins = c("ALYREF."), type ='centered')
+
+# Plot a barplot for the protein CHTOP with the data centered
+#plot_single(dep, proteins = "CHTOP.", type = "centered")
+
+# Plot a frequency plot of significant proteins for the different conditions
+plot_cond(dep)
+```
+
+
+```{r}
+# Generate a results table
+data_results <- get_results(dep)
+
+# Number of significant proteins
+data_results %>% filter(significant) %>% nrow()
+
+# Generate a wide data.frame
+df_wide <- get_df_wide(dep)
+# Generate a long data.frame
+df_long <- get_df_long(dep)
+
+#write.csv(df_wide, 'Gluc_MMA_ADMA_SDMA_PerResidue.csv')
+
+#plot pvals
+hist(data_results$GSK591_vs_DMSO_p.val)
+hist(data_results$MS023_vs_DMSO_p.val)
+hist(data_results$MS023_vs_GSK591_p.val)
+hist(data_results$GSK591_vs_DMSO_p.adj)
+hist(data_results$MS023_vs_DMSO_p.adj)
+hist(data_results$MS023_vs_GSK591_p.adj)
+
+
+```
